@@ -1,0 +1,240 @@
+{
+  "name": "Example Webhook Flow - Complete AI Integration",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "game-ai-request",
+        "responseMode": "onReceived",
+        "options": {
+          "responseData": "allEntries",
+          "responsePropertyName": "data"
+        }
+      },
+      "id": "webhook_trigger",
+      "name": "Webhook Trigger (from game)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Extract and validate player context from game request\nconst requestData = items[0].json.body;\n\n// Validate required fields\nif (!requestData.playerId || !requestData.requestType) {\n  throw new Error('Missing required fields: playerId and requestType');\n}\n\n// Extract comprehensive player context\nconst playerContext = {\n  // Player Information\n  playerId: requestData.playerId,\n  playerName: requestData.playerName || 'Adventurer',\n  playerLevel: requestData.playerLevel || 1,\n  playerClass: requestData.playerClass || 'Warrior',\n  \n  // Game State\n  currentLocation: requestData.currentLocation || 'Unknown',\n  questProgress: requestData.questProgress || {},\n  inventory: requestData.inventory || [],\n  stats: requestData.stats || {\n    health: 100,\n    mana: 50,\n    stamina: 100\n  },\n  \n  // World Context\n  worldId: requestData.worldId,\n  worldTheme: requestData.worldTheme || 'fantasy',\n  timeOfDay: requestData.timeOfDay || 'day',\n  weather: requestData.weather || 'clear',\n  \n  // Interaction Context\n  npcName: requestData.npcName,\n  lastDialogue: requestData.lastDialogue || [],\n  playerChoices: requestData.playerChoices || [],\n  emotionalState: requestData.emotionalState || 'neutral',\n  \n  // Request Details\n  requestType: requestData.requestType, // 'dialogue', 'story', 'quest', 'narration'\n  requestContent: requestData.content || '',\n  language: requestData.language || 'en',\n  \n  // AI Preferences\n  preferredProvider: requestData.preferredProvider || 'auto',\n  creativity: requestData.creativity || 0.7,\n  responseLength: requestData.responseLength || 'medium',\n  \n  // Session Info\n  sessionId: requestData.sessionId || crypto.randomUUID(),\n  timestamp: new Date().toISOString()\n};\n\n// Log the request for monitoring\nconsole.log(`AI Request received: ${playerContext.requestType} from player ${playerContext.playerId}`);\n\nreturn [{\n  json: {\n    playerContext,\n    originalRequest: requestData,\n    processingId: crypto.randomUUID()\n  }\n}];"
+      },
+      "id": "extract_player_context",
+      "name": "Extract player context",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Choose AI provider based on request type and availability\nconst context = $json.playerContext;\nconst requestType = context.requestType;\n\n// Provider selection logic\nlet selectedProvider = 'grok'; // Default\nlet providerConfig = {};\n\n// Provider capabilities matrix\nconst providerMatrix = {\n  dialogue: {\n    primary: 'grok',\n    secondary: 'openai',\n    tertiary: 'claude',\n    features: ['personality', 'memory', 'emotion']\n  },\n  story: {\n    primary: 'multi-provider', // Use all three\n    secondary: 'grok',\n    tertiary: 'openai',\n    features: ['narrative', 'choices', 'consequences']\n  },\n  quest: {\n    primary: 'grok',\n    secondary: 'claude',\n    tertiary: 'openai',\n    features: ['procedural', 'branching', 'rewards']\n  },\n  narration: {\n    primary: 'elevenlabs',\n    secondary: 'google-tts',\n    tertiary: 'grok',\n    features: ['voice', 'emotion', 'character']\n  },\n  artwork: {\n    primary: 'midjourney',\n    secondary: 'grok-image',\n    tertiary: 'dall-e',\n    features: ['style', 'scene', 'character']\n  },\n  moderation: {\n    primary: 'multi-provider',\n    secondary: 'openai',\n    tertiary: 'grok',\n    features: ['content', 'context', 'rating']\n  }\n};\n\n// Select provider based on request type\nconst providerInfo = providerMatrix[requestType] || providerMatrix.dialogue;\n\nif (context.preferredProvider !== 'auto' && ['grok', 'openai', 'claude'].includes(context.preferredProvider)) {\n  selectedProvider = context.preferredProvider;\n} else {\n  selectedProvider = providerInfo.primary;\n}\n\n// Configure provider-specific settings\nswitch (selectedProvider) {\n  case 'grok':\n    providerConfig = {\n      model: 'grok-beta',\n      temperature: context.creativity,\n      maxTokens: context.responseLength === 'short' ? 200 : context.responseLength === 'long' ? 1000 : 500,\n      systemPrompt: `You are an AI in a ${context.worldTheme} adventure game. Current location: ${context.currentLocation}.`\n    };\n    break;\n    \n  case 'openai':\n    providerConfig = {\n      model: 'gpt-4',\n      temperature: context.creativity * 0.9, // Slightly lower for GPT-4\n      maxTokens: context.responseLength === 'short' ? 200 : context.responseLength === 'long' ? 1000 : 500,\n      systemPrompt: `You are an interactive storyteller for a ${context.worldTheme} game.`\n    };\n    break;\n    \n  case 'claude':\n    providerConfig = {\n      model: 'claude-3-opus-20240229',\n      temperature: context.creativity * 0.85,\n      maxTokens: context.responseLength === 'short' ? 200 : context.responseLength === 'long' ? 1000 : 500,\n      systemPrompt: `You are a creative game master in a ${context.worldTheme} world.`\n    };\n    break;\n    \n  case 'multi-provider':\n    providerConfig = {\n      providers: ['grok', 'openai', 'claude'],\n      aggregationMethod: 'best-of',\n      temperature: context.creativity\n    };\n    break;\n}\n\n// Add feature flags\nproviderConfig.features = providerInfo.features;\nproviderConfig.fallbackProviders = [providerInfo.secondary, providerInfo.tertiary];\n\nreturn [{\n  json: {\n    playerContext: context,\n    selectedProvider,\n    providerConfig,\n    requestType,\n    processingId: $json.processingId\n  }\n}];"
+      },
+      "id": "choose_ai_provider",
+      "name": "Choose AI provider",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.selectedProvider }}",
+              "rightValue": "grok",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "route_to_provider",
+      "name": "Route to Provider",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://api.x.ai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{$credentials.xaiApiKey}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "requestMethod": "POST",
+        "jsonParameters": true,
+        "bodyParametersJson": "{\n  \"model\": \"{{ $node['choose_ai_provider'].json.providerConfig.model }}\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"{{ $node['choose_ai_provider'].json.providerConfig.systemPrompt }}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Player: {{ $node['choose_ai_provider'].json.playerContext.playerName }} (Level {{ $node['choose_ai_provider'].json.playerContext.playerLevel }} {{ $node['choose_ai_provider'].json.playerContext.playerClass }})\\n\\nRequest: {{ $node['choose_ai_provider'].json.playerContext.requestContent }}\\n\\nContext: {{ JSON.stringify($node['choose_ai_provider'].json.playerContext) }}\"\n    }\n  ],\n  \"temperature\": {{ $node['choose_ai_provider'].json.providerConfig.temperature }},\n  \"max_tokens\": {{ $node['choose_ai_provider'].json.providerConfig.maxTokens }},\n  \"stream\": false\n}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "grok_api_request",
+      "name": "HTTP Request to Grok API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [1050, 200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{$credentials.openaiApiKey}}"
+            }
+          ]
+        },
+        "requestMethod": "POST",
+        "jsonParameters": true,
+        "bodyParametersJson": "{\n  \"model\": \"gpt-4\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"{{ $node['choose_ai_provider'].json.providerConfig.systemPrompt }}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"{{ $node['choose_ai_provider'].json.playerContext.requestContent }}\"\n    }\n  ],\n  \"temperature\": {{ $node['choose_ai_provider'].json.providerConfig.temperature }},\n  \"max_tokens\": {{ $node['choose_ai_provider'].json.providerConfig.maxTokens }}\n}"
+      },
+      "id": "openai_api_request",
+      "name": "HTTP Request to OpenAI API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [1050, 400],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "functionCode": "// Process and format AI response for game consumption\nlet aiResponse = {};\nlet rawResponse = {};\nlet success = false;\nlet error = null;\n\n// Check which provider responded\nif ($node['route_to_provider'].json.selectedProvider === 'grok') {\n  // Process Grok response\n  if ($node['grok_api_request'].json.choices) {\n    rawResponse = $node['grok_api_request'].json;\n    aiResponse = {\n      content: rawResponse.choices[0].message.content,\n      provider: 'grok',\n      model: rawResponse.model,\n      usage: rawResponse.usage\n    };\n    success = true;\n  } else if ($node['grok_api_request'].json.error) {\n    error = $node['grok_api_request'].json.error;\n    // Try fallback to OpenAI\n    if ($node['openai_api_request'].json.choices) {\n      rawResponse = $node['openai_api_request'].json;\n      aiResponse = {\n        content: rawResponse.choices[0].message.content,\n        provider: 'openai',\n        model: rawResponse.model,\n        usage: rawResponse.usage,\n        fallbackUsed: true\n      };\n      success = true;\n    }\n  }\n} else {\n  // Process OpenAI response\n  if ($node['openai_api_request'].json.choices) {\n    rawResponse = $node['openai_api_request'].json;\n    aiResponse = {\n      content: rawResponse.choices[0].message.content,\n      provider: 'openai',\n      model: rawResponse.model,\n      usage: rawResponse.usage\n    };\n    success = true;\n  }\n}\n\n// Format response based on request type\nconst requestType = $node['choose_ai_provider'].json.requestType;\nconst playerContext = $node['choose_ai_provider'].json.playerContext;\n\nlet formattedResponse = {\n  success,\n  requestId: $node['choose_ai_provider'].json.processingId,\n  timestamp: new Date().toISOString(),\n  player: {\n    id: playerContext.playerId,\n    name: playerContext.playerName\n  }\n};\n\nif (success) {\n  switch (requestType) {\n    case 'dialogue':\n      // Parse dialogue response\n      formattedResponse.dialogue = {\n        npcName: playerContext.npcName,\n        text: aiResponse.content,\n        emotion: detectEmotion(aiResponse.content),\n        choices: extractDialogueChoices(aiResponse.content),\n        questHints: extractQuestHints(aiResponse.content)\n      };\n      break;\n      \n    case 'story':\n      // Parse story continuation\n      formattedResponse.story = {\n        narrative: extractNarrative(aiResponse.content),\n        choices: extractStoryChoices(aiResponse.content),\n        worldStateChanges: extractWorldChanges(aiResponse.content),\n        imagePrompt: generateImagePrompt(aiResponse.content)\n      };\n      break;\n      \n    case 'quest':\n      // Parse quest data\n      formattedResponse.quest = {\n        title: extractQuestTitle(aiResponse.content),\n        description: extractQuestDescription(aiResponse.content),\n        objectives: extractObjectives(aiResponse.content),\n        rewards: extractRewards(aiResponse.content),\n        difficulty: playerContext.playerLevel\n      };\n      break;\n      \n    default:\n      formattedResponse.content = aiResponse.content;\n  }\n  \n  // Add metadata\n  formattedResponse.metadata = {\n    provider: aiResponse.provider,\n    model: aiResponse.model,\n    tokensUsed: aiResponse.usage?.total_tokens || 0,\n    processingTime: Date.now() - new Date($node['extract_player_context'].json.playerContext.timestamp).getTime(),\n    fallbackUsed: aiResponse.fallbackUsed || false\n  };\n} else {\n  formattedResponse.error = {\n    message: error?.message || 'AI request failed',\n    code: error?.code || 'AI_ERROR',\n    details: error\n  };\n}\n\n// Helper functions\nfunction detectEmotion(text) {\n  const emotions = ['happy', 'sad', 'angry', 'fearful', 'neutral', 'excited'];\n  // Simple emotion detection logic\n  if (text.includes('!') && text.includes('happy')) return 'happy';\n  if (text.includes('sadly') || text.includes('unfortunate')) return 'sad';\n  if (text.includes('angry') || text.includes('furious')) return 'angry';\n  return 'neutral';\n}\n\nfunction extractDialogueChoices(text) {\n  const choices = [];\n  const choicePattern = /\\d\\.\\s*(.+?)(?=\\d\\.|$)/g;\n  let match;\n  while ((match = choicePattern.exec(text)) !== null) {\n    choices.push({\n      id: `choice_${choices.length + 1}`,\n      text: match[1].trim()\n    });\n  }\n  return choices.length > 0 ? choices : [\n    { id: 'continue', text: 'Continue conversation' },\n    { id: 'leave', text: 'End conversation' }\n  ];\n}\n\nfunction extractQuestHints(text) {\n  const hints = [];\n  if (text.includes('north')) hints.push('Check the northern area');\n  if (text.includes('merchant')) hints.push('Visit the local merchant');\n  return hints;\n}\n\nfunction extractNarrative(text) {\n  return text.split('\\n\\n')[0] || text;\n}\n\nfunction extractStoryChoices(text) {\n  return extractDialogueChoices(text);\n}\n\nfunction extractWorldChanges(text) {\n  const changes = [];\n  if (text.includes('door opens')) changes.push({ type: 'unlock', target: 'door' });\n  if (text.includes('reveals')) changes.push({ type: 'discover', target: 'secret' });\n  return changes;\n}\n\nfunction generateImagePrompt(text) {\n  const scene = text.substring(0, 100);\n  return `${playerContext.worldTheme} scene: ${scene}, artistic style, high detail`;\n}\n\nfunction extractQuestTitle(text) {\n  const titleMatch = text.match(/Title:\\s*(.+?)\\n/i);\n  return titleMatch ? titleMatch[1] : 'New Quest';\n}\n\nfunction extractQuestDescription(text) {\n  const descMatch = text.match(/Description:\\s*(.+?)(?=Objectives:|$)/si);\n  return descMatch ? descMatch[1].trim() : text.substring(0, 200);\n}\n\nfunction extractObjectives(text) {\n  const objectives = [];\n  const objPattern = /(?:objective|task|goal)\\s*\\d*:?\\s*(.+?)(?=objective|task|goal|reward|$)/gi;\n  let match;\n  while ((match = objPattern.exec(text)) !== null) {\n    objectives.push({\n      id: `obj_${objectives.length + 1}`,\n      description: match[1].trim(),\n      completed: false\n    });\n  }\n  return objectives.length > 0 ? objectives : [{ id: 'obj_1', description: 'Complete the quest', completed: false }];\n}\n\nfunction extractRewards(text) {\n  const rewards = {\n    experience: 100 * playerContext.playerLevel,\n    gold: 50 * playerContext.playerLevel,\n    items: []\n  };\n  \n  const expMatch = text.match(/(\\d+)\\s*(?:exp|experience|xp)/i);\n  if (expMatch) rewards.experience = parseInt(expMatch[1]);\n  \n  const goldMatch = text.match(/(\\d+)\\s*(?:gold|coins|currency)/i);\n  if (goldMatch) rewards.gold = parseInt(goldMatch[1]);\n  \n  return rewards;\n}\n\nreturn [{\n  json: formattedResponse\n}];"
+      },
+      "id": "process_format_response",
+      "name": "Process and format response",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "={{ 'game:response:' + $json.requestId }}",
+        "value": "={{ JSON.stringify($json) }}",
+        "expire": true,
+        "ttl": 3600,
+        "options": {}
+      },
+      "id": "cache_response",
+      "name": "Cache Response",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [1450, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "functionCode": "// Send formatted response back to game\nconst response = $node['process_format_response'].json;\n\n// Add cache status\nresponse.cached = $node['cache_response'].json.success || false;\n\n// Add performance metrics\nresponse.performance = {\n  totalProcessingTime: Date.now() - new Date($node['extract_player_context'].json.playerContext.timestamp).getTime(),\n  aiResponseTime: response.metadata?.processingTime || 0,\n  cacheTime: $node['cache_response'].json.executionTime || 0\n};\n\n// Add webhook metadata\nresponse.webhook = {\n  version: '1.0',\n  workflow: 'game-ai-request',\n  environment: process.env.NODE_ENV || 'production'\n};\n\n// Log successful completion\nconsole.log(`Request ${response.requestId} completed in ${response.performance.totalProcessingTime}ms`);\n\nreturn [{\n  json: response\n}];"
+      },
+      "id": "prepare_webhook_response",
+      "name": "Prepare webhook response",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1650, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "responseCode": "={{ $json.success ? 200 : ($json.error?.code === 'RATE_LIMIT' ? 429 : 500) }}",
+        "responseHeaders": {
+          "entries": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Request-ID",
+              "value": "={{ $json.requestId }}"
+            },
+            {
+              "name": "X-AI-Provider",
+              "value": "={{ $json.metadata?.provider || 'none' }}"
+            },
+            {
+              "name": "X-Processing-Time",
+              "value": "={{ $json.performance?.totalProcessingTime || 0 }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "webhook_response",
+      "name": "Send back to game",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1850, 300]
+    }
+  ],
+  "connections": {
+    "webhook_trigger": {
+      "main": [[{"node": "extract_player_context", "type": "main", "index": 0}]]
+    },
+    "extract_player_context": {
+      "main": [[{"node": "choose_ai_provider", "type": "main", "index": 0}]]
+    },
+    "choose_ai_provider": {
+      "main": [[{"node": "route_to_provider", "type": "main", "index": 0}]]
+    },
+    "route_to_provider": {
+      "main": [
+        [{"node": "grok_api_request", "type": "main", "index": 0}],
+        [{"node": "openai_api_request", "type": "main", "index": 0}]
+      ]
+    },
+    "grok_api_request": {
+      "main": [[{"node": "process_format_response", "type": "main", "index": 0}]]
+    },
+    "openai_api_request": {
+      "main": [[{"node": "process_format_response", "type": "main", "index": 0}]]
+    },
+    "process_format_response": {
+      "main": [[{"node": "cache_response", "type": "main", "index": 0}]]
+    },
+    "cache_response": {
+      "main": [[{"node": "prepare_webhook_response", "type": "main", "index": 0}]]
+    },
+    "prepare_webhook_response": {
+      "main": [[{"node": "webhook_response", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "all",
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "webhook/error-handler"
+  }
+}

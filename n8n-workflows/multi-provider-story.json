@@ -1,0 +1,180 @@
+{
+  "name": "Multi-Provider Story Generation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "story-generation",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook_trigger",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const data = items[0].json.body.data;\n\n// Build comprehensive story context\nconst storyContext = {\n  worldTheme: data.worldData.worldInfo.theme || 'fantasy adventure',\n  currentScene: data.worldData.locations[data.currentLocation],\n  playerChoices: data.playerChoices.slice(-10),\n  inventory: data.inventory,\n  characterDevelopment: data.characterDevelopment,\n  narrativeStyle: data.worldData.worldInfo.narrativeStyle || 'immersive'\n};\n\nconst basePrompt = `Continue this ${storyContext.worldTheme} story.\n\nCurrent scene: ${storyContext.currentScene.name}\n${storyContext.currentScene.description}\n\nRecent player choices: ${JSON.stringify(storyContext.playerChoices)}\n\nCharacter development: ${JSON.stringify(storyContext.characterDevelopment)}\n\nStory point: ${data.storyPoint}\n\nGenerate:\n1. Engaging narrative continuation (2-3 paragraphs)\n2. 3-4 meaningful choices for the player\n3. Potential consequences for each choice\n4. Character development updates`;\n\nreturn [{\n  json: {\n    providers: data.providers,\n    basePrompt,\n    storyContext,\n    sessionId: data.sessionId\n  }\n}];"
+      },
+      "id": "prepare_context",
+      "name": "Prepare Context",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "mode": "multipleItems"
+      },
+      "id": "split_providers",
+      "name": "Split by Provider",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://api.x.ai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{$credentials.xaiApiKey}}"
+            }
+          ]
+        },
+        "requestMethod": "POST",
+        "jsonParameters": true,
+        "bodyParametersJson": "{\n  \"model\": \"grok-beta\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a master storyteller creating an immersive adventure narrative.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"{{ $node['prepare_context'].json.basePrompt }}\"\n    }\n  ],\n  \"temperature\": 0.9,\n  \"max_tokens\": 800\n}"
+      },
+      "id": "grok_provider",
+      "name": "Grok Provider",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [850, 200]
+    },
+    {
+      "parameters": {
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{$credentials.openaiApiKey}}"
+            }
+          ]
+        },
+        "requestMethod": "POST",
+        "jsonParameters": true,
+        "bodyParametersJson": "{\n  \"model\": \"gpt-4\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a creative storyteller specializing in interactive narratives.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"{{ $node['prepare_context'].json.basePrompt }}\"\n    }\n  ],\n  \"temperature\": 0.8,\n  \"max_tokens\": 800\n}"
+      },
+      "id": "openai_provider",
+      "name": "OpenAI Provider",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [850, 400]
+    },
+    {
+      "parameters": {
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "{{$credentials.claudeApiKey}}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "requestMethod": "POST",
+        "jsonParameters": true,
+        "bodyParametersJson": "{\n  \"model\": \"claude-3-opus-20240229\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"{{ $node['prepare_context'].json.basePrompt }}\"\n    }\n  ],\n  \"max_tokens\": 800,\n  \"temperature\": 0.8\n}"
+      },
+      "id": "claude_provider",
+      "name": "Claude Provider",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [850, 600]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Merge and analyze responses from all providers\nconst responses = items.map(item => ({\n  provider: item.provider,\n  content: item.json.choices?.[0]?.message?.content || item.json.content?.[0]?.text || '',\n  tokens: item.json.usage?.total_tokens || 0\n}));\n\n// Extract narrative elements from each response\nconst narratives = [];\nconst allChoices = [];\nconst allConsequences = [];\nconst characterUpdates = {};\n\nresponses.forEach(response => {\n  const content = response.content;\n  \n  // Extract narrative (before choices)\n  const narrativeMatch = content.match(/^([\\s\\S]*?)(?:Choices:|Options:|1\\.|Player choices:)/i);\n  if (narrativeMatch) {\n    narratives.push(narrativeMatch[1].trim());\n  }\n  \n  // Extract choices\n  const choicesMatch = content.match(/(?:Choices:|Options:|Player choices:)([\\s\\S]*?)(?:Consequences:|$)/i);\n  if (choicesMatch) {\n    const choiceLines = choicesMatch[1].split('\\n').filter(line => line.trim());\n    allChoices.push(...choiceLines);\n  }\n  \n  // Extract consequences\n  const consequencesMatch = content.match(/Consequences:([\\s\\S]*?)(?:Character development:|$)/i);\n  if (consequencesMatch) {\n    allConsequences.push(consequencesMatch[1].trim());\n  }\n  \n  // Extract character updates\n  const characterMatch = content.match(/Character development:([\\s\\S]*?)$/i);\n  if (characterMatch) {\n    try {\n      Object.assign(characterUpdates, JSON.parse(characterMatch[1]));\n    } catch (e) {\n      // Parse as text if not JSON\n      characterUpdates.notes = characterMatch[1].trim();\n    }\n  }\n});\n\n// Select best narrative (longest and most detailed)\nconst bestNarrative = narratives.sort((a, b) => b.length - a.length)[0] || '';\n\n// Deduplicate and format choices\nconst uniqueChoices = [...new Set(allChoices)]\n  .map(choice => choice.replace(/^[0-9\\.\\)\\-\\s]+/, '').trim())\n  .filter(choice => choice.length > 10)\n  .slice(0, 4);\n\n// Calculate total tokens\nconst totalTokens = responses.reduce((sum, r) => sum + r.tokens, 0);\n\nreturn [{\n  json: {\n    narrative: bestNarrative,\n    choices: uniqueChoices.map((text, index) => ({\n      id: `choice_${index + 1}`,\n      text,\n      action: 'continue',\n      target: `story_point_${Date.now()}_${index + 1}`\n    })),\n    consequences: allConsequences,\n    characterUpdates,\n    providers: responses.map(r => r.provider),\n    totalTokens,\n    metadata: {\n      timestamp: new Date().toISOString(),\n      sessionId: $node['prepare_context'].json.sessionId\n    }\n  }\n}];"
+      },
+      "id": "merge_responses",
+      "name": "Merge & Analyze",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1150, 400]
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "story:{{ $json.metadata.sessionId }}:latest",
+        "value": "={{ JSON.stringify($json) }}",
+        "expire": true,
+        "ttl": 3600
+      },
+      "id": "cache_result",
+      "name": "Cache Story",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [1350, 400]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "webhook_response",
+      "name": "Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1550, 400]
+    }
+  ],
+  "connections": {
+    "webhook_trigger": {
+      "main": [[{"node": "prepare_context", "type": "main", "index": 0}]]
+    },
+    "prepare_context": {
+      "main": [[{"node": "split_providers", "type": "main", "index": 0}]]
+    },
+    "split_providers": {
+      "main": [
+        [{"node": "grok_provider", "type": "main", "index": 0}],
+        [{"node": "openai_provider", "type": "main", "index": 0}],
+        [{"node": "claude_provider", "type": "main", "index": 0}]
+      ]
+    },
+    "grok_provider": {
+      "main": [[{"node": "merge_responses", "type": "main", "index": 0}]]
+    },
+    "openai_provider": {
+      "main": [[{"node": "merge_responses", "type": "main", "index": 0}]]
+    },
+    "claude_provider": {
+      "main": [[{"node": "merge_responses", "type": "main", "index": 0}]]
+    },
+    "merge_responses": {
+      "main": [[{"node": "cache_result", "type": "main", "index": 0}]]
+    },
+    "cache_result": {
+      "main": [[{"node": "webhook_response", "type": "main", "index": 0}]]
+    }
+  }
+}

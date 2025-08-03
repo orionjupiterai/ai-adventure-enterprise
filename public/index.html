@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Adventure Storyteller</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .chat-bubble-user {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .chat-bubble-ai {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        .typing-indicator {
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 min-h-screen">
+    
+    <!-- Login Screen -->
+    <div id="auth-screen" class="min-h-screen flex items-center justify-center p-4">
+        <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-8 w-full max-w-md border border-white/20">
+            <h1 class="text-3xl font-bold text-white text-center mb-8">
+                🎭 AI Adventure Storyteller
+            </h1>
+            
+            <!-- Login Form -->
+            <div id="login-form">
+                <h2 class="text-xl text-white mb-6 text-center">Welcome Back</h2>
+                <div class="space-y-4">
+                    <input type="text" id="login-username" placeholder="Username" 
+                           class="w-full p-3 rounded-lg bg-white/10 border border-white/30 text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    <input type="password" id="login-password" placeholder="Password" 
+                           class="w-full p-3 rounded-lg bg-white/10 border border-white/30 text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    <button onclick="login()" class="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white p-3 rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition duration-300">
+                        Login
+                    </button>
+                </div>
+                <p class="text-white/70 text-center mt-4">
+                    Don't have an account? 
+                    <span onclick="showRegister()" class="text-purple-300 cursor-pointer hover:underline">Sign up</span>
+                </p>
+            </div>
+            
+            <!-- Register Form -->
+            <div id="register-form" class="hidden">
+                <h2 class="text-xl text-white mb-6 text-center">Create Account</h2>
+                <div class="space-y-4">
+                    <input type="text" id="register-username" placeholder="Choose Username" 
+                           class="w-full p-3 rounded-lg bg-white/10 border border-white/30 text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    <input type="email" id="register-email" placeholder="Email Address" 
+                           class="w-full p-3 rounded-lg bg-white/10 border border-white/30 text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    <input type="password" id="register-password" placeholder="Create Password" 
+                           class="w-full p-3 rounded-lg bg-white/10 border border-white/30 text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    <button onclick="register()" class="w-full bg-gradient-to-r from-green-600 to-teal-600 text-white p-3 rounded-lg font-semibold hover:from-green-700 hover:to-teal-700 transition duration-300">
+                        Create Account
+                    </button>
+                </div>
+                <p class="text-white/70 text-center mt-4">
+                    Already have an account? 
+                    <span onclick="showLogin()" class="text-purple-300 cursor-pointer hover:underline">Login</span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Dashboard -->
+    <div id="dashboard-screen" class="hidden min-h-screen p-4">
+        <div class="max-w-6xl mx-auto">
+            <!-- Header -->
+            <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-6 mb-6 border border-white/20">
+                <div class="flex justify-between items-center">
+                    <h1 class="text-2xl font-bold text-white">Welcome back, <span id="user-name"></span>!</h1>
+                    <button onclick="logout()" class="bg-red-500/20 text-red-300 px-4 py-2 rounded-lg hover:bg-red-500/30 transition duration-300">
+                        Logout
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Game Options -->
+            <div class="grid md:grid-cols-2 gap-6 mb-6">
+                <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
+                    <h2 class="text-xl font-semibold text-white mb-4">🆕 Start New Adventure</h2>
+                    <p class="text-white/70 mb-4">Begin a fresh story with AI-powered narrative generation</p>
+                    <button onclick="startNewGame()" class="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white p-3 rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition duration-300">
+                        New Adventure
+                    </button>
+                </div>
+                
+                <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
+                    <h2 class="text-xl font-semibold text-white mb-4">📚 Load Saved Game</h2>
+                    <p class="text-white/70 mb-4">Continue your existing adventures</p>
+                    <button onclick="showSavedGames()" class="w-full bg-gradient-to-r from-green-600 to-teal-600 text-white p-3 rounded-lg font-semibold hover:from-green-700 hover:to-teal-700 transition duration-300">
+                        Load Game
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Saved Games List -->
+            <div id="saved-games-list" class="hidden bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
+                <h2 class="text-xl font-semibold text-white mb-4">Your Saved Adventures</h2>
+                <div id="games-container" class="space-y-3">
+                    <!-- Saved games will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Interface -->
+    <div id="game-screen" class="hidden min-h-screen flex flex-col">
+        <!-- Chat Header -->
+        <div class="bg-white/10 backdrop-blur-lg border-b border-white/20 p-4">
+            <div class="max-w-4xl mx-auto flex justify-between items-center">
+                <h1 class="text-xl font-semibold text-white">🎭 AI Storyteller</h1>
+                <div class="flex space-x-2">
+                    <button onclick="saveCurrentGame()" class="bg-blue-500/20 text-blue-300 px-4 py-2 rounded-lg hover:bg-blue-500/30 transition duration-300">
+                        💾 Save
+                    </button>
+                    <button onclick="returnToDashboard()" class="bg-gray-500/20 text-gray-300 px-4 py-2 rounded-lg hover:bg-gray-500/30 transition duration-300">
+                        🏠 Dashboard
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Chat Area -->
+        <div class="flex-1 max-w-4xl mx-auto w-full p-4">
+            <div id="chat-container" class="space-y-4 mb-4 max-h-96 overflow-y-auto">
+                <!-- Chat messages will appear here -->
+            </div>
+            
+            <!-- Typing Indicator -->
+            <div id="typing-indicator" class="hidden flex items-center space-x-2 text-white/70 mb-4">
+                <div class="typing-indicator">AI is crafting your story...</div>
+            </div>
+            
+            <!-- Input Area -->
+            <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-4 border border-white/20">
+                <div class="flex space-x-3">
+                    <input type="text" id="story-input" placeholder="Describe what you want to do next..." 
+                           class="flex-1 p-3 rounded-lg bg-white/10 border border-white/30 text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                           onkeypress="handleEnterKey(event)">
+                    <button onclick="sendMessage()" class="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition duration-300">
+                        Send
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = null;
+        let currentGameId = null;
+        let chatHistory = [];
+        
+        // Authentication Functions
+        async function login() {
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+            
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    currentUser = data.user;
+                    showDashboard();
+                } else {
+                    alert('Login failed: ' + data.message);
+                }
+            } catch (error) {
+                alert('Login error: ' + error.message);
+            }
+        }
+        
+        async function register() {
+            const username = document.getElementById('register-username').value;
+            const email = document.getElementById('register-email').value;
+            const password = document.getElementById('register-password').value;
+            
+            try {
+                const response = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, email, password })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    alert('Account created successfully! Please login.');
+                    showLogin();
+                } else {
+                    alert('Registration failed: ' + data.message);
+                }
+            } catch (error) {
+                alert('Registration error: ' + error.message);
+            }
+        }
+        
+        function showLogin() {
+            document.getElementById('login-form').classList.remove('hidden');
+            document.getElementById('register-form').classList.add('hidden');
+        }
+        
+        function showRegister() {
+            document.getElementById('login-form').classList.add('hidden');
+            document.getElementById('register-form').classList.remove('hidden');
+        }
+        
+        function showDashboard() {
+            document.getElementById('auth-screen').classList.add('hidden');
+            document.getElementById('dashboard-screen').classList.remove('hidden');
+            document.getElementById('user-name').textContent = currentUser.username;
+        }
+        
+        function logout() {
+            currentUser = null;
+            document.getElementById('dashboard-screen').classList.add('hidden');
+            document.getElementById('auth-screen').classList.remove('hidden');
+        }
+        
+        // Game Functions
+        async function startNewGame() {
+            currentGameId = 'new-' + Date.now();
+            chatHistory = [];
+            
+            // Add welcome message
+            addMessageToChat('ai', 'Welcome to your AI-powered adventure! I\'m your storyteller, ready to craft an epic tale based on your choices. Where would you like your adventure to begin?', null);
+            
+            showGameScreen();
+        }
+        
+        async function showSavedGames() {
+            try {
+                const response = await fetch(`/api/games/user/${currentUser.id}`);
+                const games = await response.json();
+                
+                const container = document.getElementById('games-container');
+                container.innerHTML = '';
+                
+                games.forEach(game => {
+                    const gameDiv = document.createElement('div');
+                    gameDiv.className = 'bg-white/5 p-4 rounded-lg cursor-pointer hover:bg-white/10 transition duration-300';
+                    gameDiv.innerHTML = `
+                        <h3 class="text-white font-semibold">${game.title}</h3>
+                        <p class="text-white/70 text-sm">${new Date(game.updated_at).toLocaleDateString()}</p>
+                    `;
+                    gameDiv.onclick = () => loadGame(game.id);
+                    container.appendChild(gameDiv);
+                });
+                
+                document.getElementById('saved-games-list').classList.remove('hidden');
+            } catch (error) {
+                alert('Error loading saved games: ' + error.message);
+            }
+        }
+        
+        async function loadGame(gameId) {
+            try {
+                const response = await fetch(`/api/games/${gameId}`);
+                const gameData = await response.json();
+                
+                currentGameId = gameId;
+                chatHistory = JSON.parse(gameData.chat_history || '[]');
+                
+                showGameScreen();
+                displayChatHistory();
+            } catch (error) {
+                alert('Error loading game: ' + error.message);
+            }
+        }
+        
+        function showGameScreen() {
+            document.getElementById('dashboard-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+        }
+        
+        function returnToDashboard() {
+            document.getElementById('game-screen').classList.add('hidden');
+            document.getElementById('dashboard-screen').classList.remove('hidden');
+        }
+        
+        // Chat Functions
+        function addMessageToChat(sender, message, imageUrl) {
+            const chatContainer = document.getElementById('chat-container');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `flex ${sender === 'user' ? 'justify-end' : 'justify-start'} mb-4`;
+            
+            const bubbleClass = sender === 'user' ? 'chat-bubble-user' : 'chat-bubble-ai';
+            
+            messageDiv.innerHTML = `
+                <div class="${bubbleClass} text-white p-4 rounded-2xl max-w-md shadow-lg">
+                    <div class="font-semibold mb-2">${sender === 'user' ? 'You' : 'AI Storyteller'}</div>
+                    <div class="whitespace-pre-wrap">${message}</div>
+                    ${imageUrl ? `<img src="${imageUrl}" alt="Generated scene" class="mt-3 rounded-lg w-full">` : ''}
+                </div>
+            `;
+            
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            
+            // Add to chat history
+            chatHistory.push({
+                sender,
+                message,
+                imageUrl,
+                timestamp: new Date().toISOString()
+            });
+        }
+        
+        function displayChatHistory() {
+            const chatContainer = document.getElementById('chat-container');
+            chatContainer.innerHTML = '';
+            
+            chatHistory.forEach(chat => {
+                addMessageToChat(chat.sender, chat.message, chat.imageUrl);
+            });
+        }
+        
+        async function sendMessage() {
+            const input = document.getElementById('story-input');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            // Add user message
+            addMessageToChat('user', message, null);
+            input.value = '';
+            
+            // Show typing indicator
+            document.getElementById('typing-indicator').classList.remove('hidden');
+            
+            try {
+                // Send to AI API
+                const response = await fetch('/api/story/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        prompt: message,
+                        chatHistory: chatHistory,
+                        gameId: currentGameId
+                    })
+                });
+                
+                const data = await response.json();
+                
+                // Hide typing indicator
+                document.getElementById('typing-indicator').classList.add('hidden');
+                
+                // Add AI response
+                addMessageToChat('ai', data.story, data.imageUrl);
+                
+            } catch (error) {
+                document.getElementById('typing-indicator').classList.add('hidden');
+                addMessageToChat('ai', 'Sorry, I encountered an error generating your story. Please try again.', null);
+            }
+        }
+        
+        function handleEnterKey(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+        
+        async function saveCurrentGame() {
+            if (!currentGameId || chatHistory.length === 0) return;
+            
+            const title = prompt('Enter a title for this adventure:') || `Adventure ${new Date().toLocaleDateString()}`;
+            
+            try {
+                await fetch('/api/games/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        gameId: currentGameId,
+                        userId: currentUser.id,
+                        title: title,
+                        chatHistory: JSON.stringify(chatHistory)
+                    })
+                });
+                
+                alert('Game saved successfully!');
+            } catch (error) {
+                alert('Error saving game: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,196 @@
+{
+  "name": "Midjourney Artwork Generation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "artwork-generation",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook_trigger",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const data = items[0].json.body.data;\n\n// Build comprehensive prompt for Midjourney\nconst styleMap = {\n  'fantasy': 'fantasy art, magical, ethereal',\n  'sci-fi': 'science fiction, futuristic, cyberpunk',\n  'horror': 'dark fantasy, gothic, atmospheric',\n  'realistic': 'photorealistic, cinematic, highly detailed'\n};\n\nconst aspectMap = {\n  '16:9': '--ar 16:9',\n  '4:3': '--ar 4:3',\n  '1:1': '--ar 1:1',\n  '9:16': '--ar 9:16'\n};\n\nconst qualityMap = {\n  'high': '--quality 2',\n  'medium': '--quality 1',\n  'fast': '--quality 0.5'\n};\n\nconst enhancedPrompt = `${data.prompt}, ${styleMap[data.style] || data.style} ${aspectMap[data.aspectRatio] || '--ar 16:9'} ${qualityMap[data.quality] || '--quality 1'} --v 6`;\n\nreturn [{\n  json: {\n    prompt: enhancedPrompt,\n    originalPrompt: data.prompt,\n    style: data.style,\n    aspectRatio: data.aspectRatio,\n    quality: data.quality,\n    sceneContext: data.sceneContext,\n    provider: data.provider || 'midjourney',\n    fallbackProvider: data.fallbackProvider || 'grok-image'\n  }\n}];"
+      },
+      "id": "prepare_prompt",
+      "name": "Prepare Prompt",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.provider }}",
+              "rightValue": "midjourney",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "route_provider",
+      "name": "Route by Provider",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://discord.com/api/v10/interactions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bot {{$credentials.discordBotToken}}"
+            }
+          ]
+        },
+        "requestMethod": "POST",
+        "jsonParameters": true,
+        "bodyParametersJson": "{\n  \"type\": 2,\n  \"application_id\": \"{{$credentials.midjourneyAppId}}\",\n  \"guild_id\": \"{{$credentials.discordGuildId}}\",\n  \"channel_id\": \"{{$credentials.discordChannelId}}\",\n  \"data\": {\n    \"version\": \"1166847114203123795\",\n    \"id\": \"938956540159881230\",\n    \"name\": \"imagine\",\n    \"type\": 1,\n    \"options\": [\n      {\n        \"type\": 3,\n        \"name\": \"prompt\",\n        \"value\": \"{{ $json.prompt }}\"\n      }\n    ]\n  }\n}"
+      },
+      "id": "midjourney_discord",
+      "name": "Midjourney Discord",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [850, 200]
+    },
+    {
+      "parameters": {
+        "url": "https://api.x.ai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{$credentials.xaiApiKey}}"
+            }
+          ]
+        },
+        "requestMethod": "POST",
+        "jsonParameters": true,
+        "bodyParametersJson": "{\n  \"model\": \"grok-2-vision-1212\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Generate an image: {{ $json.originalPrompt }}\"\n    }\n  ],\n  \"temperature\": 0.7,\n  \"max_tokens\": 100\n}"
+      },
+      "id": "grok_image_fallback",
+      "name": "Grok Image Fallback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [850, 400]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Wait for Midjourney webhook or timeout\nconst jobId = crypto.randomUUID();\nconst startTime = Date.now();\n\n// Store job in Redis for webhook callback\nconst redisKey = `midjourney:job:${jobId}`;\n\nreturn [{\n  json: {\n    jobId,\n    prompt: $json.prompt,\n    status: 'processing',\n    provider: 'midjourney',\n    webhookUrl: `${process.env.N8N_BASE_URL}/webhook-waiting/midjourney/${jobId}`,\n    timeout: 120000 // 2 minutes\n  }\n}];"
+      },
+      "id": "wait_for_midjourney",
+      "name": "Wait for Midjourney",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "key": "={{ 'midjourney:result:' + $json.jobId }}",
+        "options": {
+          "dotNotation": false
+        }
+      },
+      "id": "check_result",
+      "name": "Check Result",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [1250, 200]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Process the image result\nlet result;\n\nif ($node['route_provider'].json.provider === 'midjourney') {\n  // Midjourney result\n  const midjourneyData = $json.value ? JSON.parse($json.value) : null;\n  \n  if (midjourneyData && midjourneyData.imageUrl) {\n    result = {\n      imageUrl: midjourneyData.imageUrl,\n      thumbnailUrl: midjourneyData.thumbnailUrl || midjourneyData.imageUrl,\n      provider: 'midjourney',\n      jobId: $node['wait_for_midjourney'].json.jobId,\n      processingTime: Date.now() - $node['wait_for_midjourney'].json.startTime,\n      metadata: {\n        prompt: $node['prepare_prompt'].json.prompt,\n        style: $node['prepare_prompt'].json.style,\n        aspectRatio: $node['prepare_prompt'].json.aspectRatio\n      }\n    };\n  } else {\n    // Fallback to Grok if Midjourney fails\n    throw new Error('Midjourney generation failed, falling back to Grok');\n  }\n} else {\n  // Grok result\n  const grokResponse = $node['grok_image_fallback'].json;\n  \n  result = {\n    imageUrl: grokResponse.imageUrl || 'https://via.placeholder.com/1024x1024?text=Generated+Image',\n    thumbnailUrl: grokResponse.thumbnailUrl || grokResponse.imageUrl,\n    provider: 'grok-image',\n    processingTime: Date.now() - $node['prepare_prompt'].json.timestamp,\n    metadata: {\n      prompt: $node['prepare_prompt'].json.originalPrompt,\n      model: 'grok-2-vision-1212'\n    }\n  };\n}\n\nreturn [{\n  json: result\n}];"
+      },
+      "id": "process_result",
+      "name": "Process Result",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1450, 300]
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "={{ 'artwork:' + $json.metadata.prompt.substring(0, 50).replace(/[^a-zA-Z0-9]/g, '_') }}",
+        "value": "={{ JSON.stringify($json) }}",
+        "expire": true,
+        "ttl": 86400
+      },
+      "id": "cache_artwork",
+      "name": "Cache Artwork",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [1650, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "webhook_response",
+      "name": "Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1850, 300]
+    }
+  ],
+  "connections": {
+    "webhook_trigger": {
+      "main": [[{"node": "prepare_prompt", "type": "main", "index": 0}]]
+    },
+    "prepare_prompt": {
+      "main": [[{"node": "route_provider", "type": "main", "index": 0}]]
+    },
+    "route_provider": {
+      "main": [
+        [{"node": "midjourney_discord", "type": "main", "index": 0}],
+        [{"node": "grok_image_fallback", "type": "main", "index": 0}]
+      ]
+    },
+    "midjourney_discord": {
+      "main": [[{"node": "wait_for_midjourney", "type": "main", "index": 0}]]
+    },
+    "wait_for_midjourney": {
+      "main": [[{"node": "check_result", "type": "main", "index": 0}]]
+    },
+    "check_result": {
+      "main": [[{"node": "process_result", "type": "main", "index": 0}]]
+    },
+    "grok_image_fallback": {
+      "main": [[{"node": "process_result", "type": "main", "index": 0}]]
+    },
+    "process_result": {
+      "main": [[{"node": "cache_artwork", "type": "main", "index": 0}]]
+    },
+    "cache_artwork": {
+      "main": [[{"node": "webhook_response", "type": "main", "index": 0}]]
+    }
+  }
+}

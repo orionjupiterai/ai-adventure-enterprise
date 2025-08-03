@@ -1,0 +1,171 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Press+Start+2P&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply scroll-smooth;
+  }
+  
+  body {
+    @apply bg-adventure-dark text-gray-100 font-sans antialiased;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-fantasy font-semibold;
+  }
+}
+
+@layer components {
+  /* Custom button styles */
+  .btn-primary {
+    @apply bg-adventure-accent hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl;
+  }
+  
+  .btn-secondary {
+    @apply bg-adventure-secondary hover:bg-blue-900 text-white font-bold py-2 px-4 rounded-lg transition-all duration-200 transform hover:scale-105 active:scale-95;
+  }
+  
+  .btn-ghost {
+    @apply bg-transparent hover:bg-white/10 text-white font-bold py-2 px-4 rounded-lg transition-all duration-200 border border-white/20 hover:border-white/40;
+  }
+  
+  /* Card styles */
+  .adventure-card {
+    @apply bg-adventure-darker rounded-xl shadow-2xl p-6 border border-white/10 backdrop-blur-sm hover:border-adventure-accent/50 transition-all duration-300;
+  }
+  
+  /* Input styles */
+  .adventure-input {
+    @apply bg-adventure-dark border border-white/20 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:border-adventure-accent focus:ring-2 focus:ring-adventure-accent/50 transition-all duration-200;
+  }
+  
+  /* Loading spinner */
+  .spinner {
+    @apply inline-block w-8 h-8 border-4 border-adventure-accent border-t-transparent rounded-full animate-spin;
+  }
+  
+  /* Game UI elements */
+  .game-panel {
+    @apply bg-gradient-to-br from-adventure-darker to-adventure-dark rounded-xl p-4 border border-white/10 shadow-inner;
+  }
+  
+  .inventory-slot {
+    @apply w-16 h-16 bg-adventure-dark border-2 border-white/20 rounded-lg hover:border-adventure-accent transition-all duration-200 cursor-pointer flex items-center justify-center;
+  }
+  
+  .dialogue-box {
+    @apply bg-black/80 border-2 border-white/30 rounded-lg p-4 text-white font-game text-sm leading-relaxed backdrop-blur-md;
+  }
+  
+  /* Animations */
+  .text-glow {
+    @apply animate-glow;
+  }
+  
+  .floating {
+    @apply animate-float;
+  }
+}
+
+@layer utilities {
+  /* Custom utilities */
+  .text-shadow {
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+  }
+  
+  .text-shadow-lg {
+    text-shadow: 4px 4px 8px rgba(0, 0, 0, 0.9);
+  }
+  
+  /* Gradient text */
+  .text-gradient {
+    @apply bg-gradient-to-r from-adventure-accent to-pink-400 bg-clip-text text-transparent;
+  }
+  
+  /* Glass morphism */
+  .glass {
+    @apply bg-white/5 backdrop-blur-lg border border-white/10;
+  }
+  
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Custom scrollbar styles */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-adventure-darker;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-adventure-accent rounded-full hover:bg-red-600;
+}
+
+::-webkit-scrollbar-thumb:active {
+  @apply bg-red-700;
+}
+
+/* Loading animation for game states */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+/* Game-specific styles */
+.choice-button {
+  @apply relative overflow-hidden;
+}
+
+.choice-button::before {
+  content: '';
+  @apply absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full transition-transform duration-500;
+}
+
+.choice-button:hover::before {
+  @apply translate-x-full;
+}
+
+/* Health/Mana bars */
+.stat-bar {
+  @apply relative h-6 bg-adventure-darker rounded-full overflow-hidden;
+}
+
+.stat-bar-fill {
+  @apply absolute inset-y-0 left-0 transition-all duration-500 ease-out;
+}
+
+.health-bar-fill {
+  @apply bg-gradient-to-r from-red-600 to-red-400;
+}
+
+.mana-bar-fill {
+  @apply bg-gradient-to-r from-blue-600 to-blue-400;
+}
+
+.stamina-bar-fill {
+  @apply bg-gradient-to-r from-green-600 to-green-400;
+}

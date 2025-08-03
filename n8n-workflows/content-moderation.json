@@ -1,0 +1,216 @@
+{
+  "name": "Content Moderation with Structured Reasoning",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "content-moderation",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook_trigger",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const data = items[0].json.body.data;\n\n// Prepare content for moderation\nconst moderationContext = {\n  contentType: data.contentType,\n  content: data.content,\n  author: data.author,\n  worldContext: data.worldContext,\n  previousFlags: data.previousFlags || [],\n  moderationRules: data.moderationRules || {\n    violence: 'moderate',\n    language: 'strict',\n    suggestive: 'strict',\n    hate: 'strict',\n    selfHarm: 'strict'\n  }\n};\n\n// Build structured reasoning prompt\nconst reasoningPrompt = `Analyze this content for moderation issues using structured reasoning.\n\nContent Type: ${moderationContext.contentType}\nContent: ${moderationContext.content}\nWorld Context: ${JSON.stringify(moderationContext.worldContext)}\n\nProvide analysis in this structure:\n1. Initial Assessment: First impression and obvious concerns\n2. Category Analysis:\n   - Violence: [score 0-10, reasoning]\n   - Language: [score 0-10, reasoning]\n   - Suggestive Content: [score 0-10, reasoning]\n   - Hate Speech: [score 0-10, reasoning]\n   - Self-Harm: [score 0-10, reasoning]\n3. Context Consideration: How the world/genre context affects ratings\n4. Final Decision: PASS/FLAG/REJECT with explanation\n5. Suggested Modifications: If flagged, how to make it acceptable`;\n\nreturn [{\n  json: {\n    moderationContext,\n    reasoningPrompt,\n    sessionId: data.sessionId,\n    requestId: crypto.randomUUID()\n  }\n}];"
+      },
+      "id": "prepare_moderation",
+      "name": "Prepare Moderation",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.moderationContext.contentType }}",
+              "rightValue": "user_generated",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "route_content_type",
+      "name": "Route by Content Type",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://api.x.ai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{$credentials.xaiApiKey}}"
+            }
+          ]
+        },
+        "requestMethod": "POST",
+        "jsonParameters": true,
+        "bodyParametersJson": "{\n  \"model\": \"grok-beta\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a content moderation expert specializing in game content. Analyze content objectively using structured reasoning.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"{{ $json.reasoningPrompt }}\"\n    }\n  ],\n  \"temperature\": 0.3,\n  \"max_tokens\": 600\n}"
+      },
+      "id": "grok_moderation",
+      "name": "Grok Moderation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [850, 200]
+    },
+    {
+      "parameters": {
+        "url": "https://api.openai.com/v1/moderations",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{$credentials.openaiApiKey}}"
+            }
+          ]
+        },
+        "requestMethod": "POST",
+        "jsonParameters": true,
+        "bodyParametersJson": "{\n  \"input\": \"{{ $json.moderationContext.content }}\"\n}"
+      },
+      "id": "openai_moderation",
+      "name": "OpenAI Moderation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [850, 400]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Parse moderation results\nlet finalDecision = 'PASS';\nlet flags = [];\nlet scores = {};\nlet reasoning = {};\nlet modifications = [];\n\n// Process Grok structured analysis\nif ($node['grok_moderation'].json.choices) {\n  const grokContent = $node['grok_moderation'].json.choices[0].message.content;\n  \n  // Extract scores using regex\n  const categories = ['violence', 'language', 'suggestive', 'hate', 'self-harm'];\n  categories.forEach(cat => {\n    const scoreMatch = grokContent.match(new RegExp(`${cat}.*?\\\\[score (\\\\d+)`, 'i'));\n    if (scoreMatch) {\n      scores[cat] = parseInt(scoreMatch[1]);\n    }\n  });\n  \n  // Extract final decision\n  const decisionMatch = grokContent.match(/Final Decision: (PASS|FLAG|REJECT)/i);\n  if (decisionMatch) {\n    finalDecision = decisionMatch[1];\n  }\n  \n  // Extract modifications\n  const modMatch = grokContent.match(/Suggested Modifications:([\\s\\S]*?)$/i);\n  if (modMatch) {\n    modifications.push(modMatch[1].trim());\n  }\n  \n  reasoning.grok = grokContent;\n}\n\n// Process OpenAI moderation\nif ($node['openai_moderation'].json.results) {\n  const openaiResult = $node['openai_moderation'].json.results[0];\n  \n  if (openaiResult.flagged) {\n    finalDecision = finalDecision === 'PASS' ? 'FLAG' : finalDecision;\n    \n    // Map OpenAI categories to our categories\n    const categoryMap = {\n      'violence': 'violence',\n      'hate': 'hate',\n      'self-harm': 'self-harm',\n      'sexual': 'suggestive'\n    };\n    \n    Object.entries(openaiResult.categories).forEach(([cat, flagged]) => {\n      if (flagged && categoryMap[cat]) {\n        flags.push(categoryMap[cat]);\n        scores[categoryMap[cat]] = Math.max(scores[categoryMap[cat]] || 0, 8);\n      }\n    });\n  }\n  \n  reasoning.openai = openaiResult;\n}\n\n// Apply world context adjustments\nconst worldContext = $node['prepare_moderation'].json.moderationContext.worldContext;\nif (worldContext.genre === 'horror' && scores.violence) {\n  scores.violence = Math.max(0, scores.violence - 2);\n  reasoning.contextAdjustment = 'Violence score reduced due to horror genre context';\n}\n\n// Determine if any score exceeds threshold\nconst thresholds = {\n  violence: 7,\n  language: 6,\n  suggestive: 5,\n  hate: 3,\n  'self-harm': 3\n};\n\nObject.entries(scores).forEach(([cat, score]) => {\n  if (score >= thresholds[cat]) {\n    flags.push(cat);\n    if (score >= 8) {\n      finalDecision = 'REJECT';\n    } else if (finalDecision === 'PASS') {\n      finalDecision = 'FLAG';\n    }\n  }\n});\n\n// Build action recommendations\nconst actions = [];\nif (finalDecision === 'FLAG') {\n  actions.push({\n    type: 'review',\n    priority: 'medium',\n    message: 'Content flagged for manual review'\n  });\n  \n  if (modifications.length > 0) {\n    actions.push({\n      type: 'suggest',\n      modifications: modifications\n    });\n  }\n} else if (finalDecision === 'REJECT') {\n  actions.push({\n    type: 'block',\n    priority: 'high',\n    message: 'Content violates community guidelines'\n  });\n}\n\nreturn [{\n  json: {\n    decision: finalDecision,\n    flags: [...new Set(flags)],\n    scores,\n    reasoning,\n    actions,\n    metadata: {\n      requestId: $node['prepare_moderation'].json.requestId,\n      timestamp: new Date().toISOString(),\n      contentType: $node['prepare_moderation'].json.moderationContext.contentType\n    }\n  }\n}];"
+      },
+      "id": "analyze_results",
+      "name": "Analyze Results",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "={{ 'moderation:' + $json.metadata.requestId }}",
+        "value": "={{ JSON.stringify($json) }}",
+        "expire": true,
+        "ttl": 86400
+      },
+      "id": "cache_decision",
+      "name": "Cache Decision",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.decision }}",
+              "rightValue": "REJECT",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "check_rejection",
+      "name": "Check if Rejected",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1450, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Log violation for monitoring\nconst violation = {\n  type: 'content_violation',\n  severity: 'high',\n  author: $node['prepare_moderation'].json.moderationContext.author,\n  flags: $json.flags,\n  scores: $json.scores,\n  content: $node['prepare_moderation'].json.moderationContext.content.substring(0, 200),\n  timestamp: new Date().toISOString()\n};\n\n// Would normally send to monitoring service\nconsole.log('Content violation logged:', violation);\n\nreturn [{\n  json: {\n    logged: true,\n    violationId: crypto.randomUUID()\n  }\n}];"
+      },
+      "id": "log_violation",
+      "name": "Log Violation",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1650, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $node['analyze_results'].json }}",
+        "options": {}
+      },
+      "id": "webhook_response",
+      "name": "Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1850, 300]
+    }
+  ],
+  "connections": {
+    "webhook_trigger": {
+      "main": [[{"node": "prepare_moderation", "type": "main", "index": 0}]]
+    },
+    "prepare_moderation": {
+      "main": [[{"node": "route_content_type", "type": "main", "index": 0}]]
+    },
+    "route_content_type": {
+      "main": [
+        [
+          {"node": "grok_moderation", "type": "main", "index": 0},
+          {"node": "openai_moderation", "type": "main", "index": 0}
+        ],
+        [{"node": "grok_moderation", "type": "main", "index": 0}]
+      ]
+    },
+    "grok_moderation": {
+      "main": [[{"node": "analyze_results", "type": "main", "index": 0}]]
+    },
+    "openai_moderation": {
+      "main": [[{"node": "analyze_results", "type": "main", "index": 0}]]
+    },
+    "analyze_results": {
+      "main": [[{"node": "cache_decision", "type": "main", "index": 0}]]
+    },
+    "cache_decision": {
+      "main": [[{"node": "check_rejection", "type": "main", "index": 0}]]
+    },
+    "check_rejection": {
+      "main": [
+        [{"node": "log_violation", "type": "main", "index": 0}],
+        [{"node": "webhook_response", "type": "main", "index": 0}]
+      ]
+    },
+    "log_violation": {
+      "main": [[{"node": "webhook_response", "type": "main", "index": 0}]]
+    }
+  }
+}

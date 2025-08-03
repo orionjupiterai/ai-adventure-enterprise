@@ -1,0 +1,131 @@
+{
+  "name": "Procedural Quest Generation with Branching Logic",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "quest-generation",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook_trigger",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const data = items[0].json.body.data;\n\n// Build quest generation context\nconst questContext = {\n  questType: data.questType || 'main_story',\n  playerLevel: data.playerLevel || 1,\n  worldTheme: data.worldTheme || 'fantasy',\n  currentLocation: data.currentLocation,\n  completedQuests: data.completedQuests || [],\n  playerSkills: data.playerSkills || [],\n  factionReputation: data.factionReputation || {},\n  preferredDifficulty: data.preferredDifficulty || 'medium'\n};\n\n// Quest type templates\nconst questTemplates = {\n  main_story: {\n    objectives: 3-5,\n    branches: 2-3,\n    rewards: 'legendary',\n    scope: 'epic'\n  },\n  side_quest: {\n    objectives: 1-3,\n    branches: 1-2,\n    rewards: 'rare',\n    scope: 'local'\n  },\n  daily_quest: {\n    objectives: 1-2,\n    branches: 0-1,\n    rewards: 'common',\n    scope: 'simple'\n  },\n  faction_quest: {\n    objectives: 2-4,\n    branches: 2-3,\n    rewards: 'faction_specific',\n    scope: 'political'\n  }\n};\n\nconst template = questTemplates[questContext.questType] || questTemplates.side_quest;\n\n// Generate quest parameters\nconst questPrompt = `Generate a ${questContext.questType} quest for a level ${questContext.playerLevel} player in a ${questContext.worldTheme} setting.\n\nLocation: ${questContext.currentLocation.name}\nPlayer Skills: ${questContext.playerSkills.join(', ')}\nDifficulty: ${questContext.preferredDifficulty}\n\nCreate a quest with:\n1. Compelling narrative hook\n2. ${template.objectives} objectives with clear progression\n3. ${template.branches} branching decision points\n4. Multiple completion paths based on player choices\n5. Consequences that affect future quests\n6. ${template.rewards} tier rewards\n7. Optional objectives for bonus rewards\n8. Failure conditions and their impacts\n\nStructure the response as JSON with:\n- title: Quest name\n- description: Quest introduction\n- objectives: Array of objective objects\n- branches: Array of decision points\n- rewards: Object with guaranteed and optional rewards\n- consequences: Object with possible world state changes\n- prerequisites: Array of required conditions\n- timeLimit: Optional time constraint`;\n\nreturn [{\n  json: {\n    questContext,\n    questPrompt,\n    template,\n    sessionId: data.sessionId,\n    requestId: crypto.randomUUID()\n  }\n}];"
+      },
+      "id": "prepare_quest_context",
+      "name": "Prepare Quest Context",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://api.x.ai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{$credentials.xaiApiKey}}"
+            }
+          ]
+        },
+        "requestMethod": "POST",
+        "jsonParameters": true,
+        "bodyParametersJson": "{\n  \"model\": \"grok-beta\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a quest designer for adventure games. Create engaging quests with branching narratives and meaningful choices. Always respond with valid JSON.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"{{ $json.questPrompt }}\"\n    }\n  ],\n  \"temperature\": 0.9,\n  \"max_tokens\": 1000\n}"
+      },
+      "id": "generate_quest_structure",
+      "name": "Generate Quest Structure",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Parse the generated quest structure\nlet questData;\ntry {\n  const response = $json.choices[0].message.content;\n  // Extract JSON from response\n  const jsonMatch = response.match(/```json\\n([\\s\\S]*?)\\n```/) || response.match(/{[\\s\\S]*}/);\n  questData = JSON.parse(jsonMatch[1] || jsonMatch[0]);\n} catch (error) {\n  // Fallback structure if parsing fails\n  questData = {\n    title: \"The Mysterious Artifact\",\n    description: \"A strange artifact has been discovered...\",\n    objectives: [\n      {\n        id: \"obj_1\",\n        description: \"Investigate the ancient ruins\",\n        type: \"exploration\",\n        required: true\n      }\n    ],\n    branches: [],\n    rewards: {\n      guaranteed: { experience: 1000, gold: 500 },\n      optional: { experience: 500, items: [\"rare_sword\"] }\n    },\n    consequences: {},\n    prerequisites: [],\n    timeLimit: null\n  };\n}\n\n// Enhance quest with procedural elements\nconst context = $node['prepare_quest_context'].json.questContext;\n\n// Add dynamic objectives based on player skills\nif (context.playerSkills.includes('stealth')) {\n  questData.objectives.push({\n    id: `obj_stealth_${Date.now()}`,\n    description: \"Optional: Complete without being detected\",\n    type: \"stealth\",\n    required: false,\n    bonus: true\n  });\n}\n\nif (context.playerSkills.includes('diplomacy')) {\n  questData.objectives.push({\n    id: `obj_diplomacy_${Date.now()}`,\n    description: \"Optional: Resolve conflict through negotiation\",\n    type: \"diplomacy\",\n    required: false,\n    bonus: true\n  });\n}\n\n// Generate branching paths\nconst branches = questData.branches || [];\nif (branches.length === 0) {\n  // Create default branches if none generated\n  branches.push({\n    id: \"branch_1\",\n    trigger: \"objective_complete:obj_1\",\n    description: \"A moral dilemma presents itself\",\n    choices: [\n      {\n        id: \"choice_1a\",\n        text: \"Take the righteous path\",\n        consequences: {\n          reputation: { faction: \"order\", change: 10 },\n          unlock: \"obj_righteous\"\n        }\n      },\n      {\n        id: \"choice_1b\",\n        text: \"Pursue personal gain\",\n        consequences: {\n          reputation: { faction: \"thieves\", change: 10 },\n          unlock: \"obj_selfish\"\n        }\n      }\n    ]\n  });\n}\n\n// Calculate dynamic rewards based on difficulty\nconst difficultyMultiplier = {\n  easy: 0.8,\n  medium: 1.0,\n  hard: 1.5,\n  extreme: 2.0\n}[context.preferredDifficulty] || 1.0;\n\nquestData.rewards.guaranteed.experience = Math.floor(\n  (questData.rewards.guaranteed.experience || 1000) * difficultyMultiplier\n);\nquestData.rewards.guaranteed.gold = Math.floor(\n  (questData.rewards.guaranteed.gold || 500) * difficultyMultiplier\n);\n\n// Add quest metadata\nquestData.metadata = {\n  questId: `quest_${context.questType}_${Date.now()}`,\n  generatedAt: new Date().toISOString(),\n  estimatedDuration: `${15 + (questData.objectives.length * 5)} minutes`,\n  replayable: context.questType === 'daily_quest',\n  level: context.playerLevel,\n  type: context.questType\n};\n\nreturn [{\n  json: {\n    quest: questData,\n    branches: branches,\n    context: context\n  }\n}];"
+      },
+      "id": "process_quest_data",
+      "name": "Process Quest Data",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Generate quest dialogue and narrative elements\nconst quest = $json.quest;\nconst narrativeElements = [];\n\n// Generate NPC dialogue for quest giver\nconst questGiverDialogue = {\n  introduction: `Greetings, adventurer. I have urgent need of someone with your... particular skills. ${quest.description}`,\n  acceptance: \"Excellent! I knew I could count on you. Here's what you need to know...\",\n  rejection: \"I see. Perhaps you'll reconsider when you realize what's at stake.\",\n  completion: \"You've done it! The realm owes you a great debt.\",\n  failure: \"This is... unfortunate. The consequences will be severe.\"\n};\n\n// Generate objective-specific dialogues\nquest.objectives.forEach(obj => {\n  narrativeElements.push({\n    objectiveId: obj.id,\n    hints: [\n      `For ${obj.description}, you might want to check the ${['northern', 'southern', 'eastern', 'western'][Math.floor(Math.random() * 4)]} area.`,\n      `Local rumors suggest ${obj.description} relates to recent strange occurrences.`,\n      `An old map might help with ${obj.description}.`\n    ],\n    completionText: `Objective completed: ${obj.description}`,\n    failureText: `Failed to ${obj.description}. This path is now closed.`\n  });\n});\n\n// Generate branching narratives\nconst branchNarratives = [];\n$json.branches.forEach(branch => {\n  branchNarratives.push({\n    branchId: branch.id,\n    narrative: branch.description,\n    choiceNarratives: branch.choices.map(choice => ({\n      choiceId: choice.id,\n      previewText: `If you ${choice.text.toLowerCase()}, you sense that ${Object.keys(choice.consequences)[0]} will be affected...`,\n      resultText: `You chose to ${choice.text.toLowerCase()}. The world shifts subtly in response to your decision.`\n    }))\n  });\n});\n\nreturn [{\n  json: {\n    quest: quest,\n    dialogue: questGiverDialogue,\n    narrativeElements,\n    branchNarratives,\n    sessionId: $node['prepare_quest_context'].json.sessionId\n  }\n}];"
+      },
+      "id": "generate_narratives",
+      "name": "Generate Narratives",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "={{ 'quest:' + $json.quest.metadata.questId }}",
+        "value": "={{ JSON.stringify($json) }}",
+        "expire": true,
+        "ttl": 604800
+      },
+      "id": "cache_quest",
+      "name": "Cache Quest",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Generate quest state tracker\nconst quest = $json.quest;\n\nconst questState = {\n  questId: quest.metadata.questId,\n  status: 'available',\n  acceptedAt: null,\n  currentObjectives: quest.objectives.filter(obj => obj.required).map(obj => ({\n    ...obj,\n    status: 'pending',\n    progress: 0\n  })),\n  completedObjectives: [],\n  activeBranches: [],\n  choicesMade: [],\n  earnedRewards: {\n    guaranteed: false,\n    optional: []\n  },\n  timeRemaining: quest.timeLimit || null\n};\n\n// Create quest tracker functions\nconst trackerFunctions = {\n  accept: () => {\n    questState.status = 'active';\n    questState.acceptedAt = new Date().toISOString();\n  },\n  updateObjective: (objectiveId, progress) => {\n    const obj = questState.currentObjectives.find(o => o.id === objectiveId);\n    if (obj) {\n      obj.progress = progress;\n      if (progress >= 100) {\n        obj.status = 'completed';\n        questState.completedObjectives.push(obj);\n        questState.currentObjectives = questState.currentObjectives.filter(o => o.id !== objectiveId);\n      }\n    }\n  },\n  makeBranchChoice: (branchId, choiceId) => {\n    questState.choicesMade.push({ branchId, choiceId, timestamp: new Date().toISOString() });\n    // Apply consequences would happen here\n  },\n  complete: () => {\n    questState.status = 'completed';\n    questState.earnedRewards.guaranteed = true;\n  }\n};\n\nreturn [{\n  json: {\n    quest: quest,\n    dialogue: $json.dialogue,\n    narrativeElements: $json.narrativeElements,\n    branchNarratives: $json.branchNarratives,\n    questState,\n    metadata: {\n      requestId: $node['prepare_quest_context'].json.requestId,\n      generatedAt: quest.metadata.generatedAt,\n      sessionId: $json.sessionId\n    }\n  }\n}];"
+      },
+      "id": "create_quest_state",
+      "name": "Create Quest State",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1450, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "webhook_response",
+      "name": "Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1650, 300]
+    }
+  ],
+  "connections": {
+    "webhook_trigger": {
+      "main": [[{"node": "prepare_quest_context", "type": "main", "index": 0}]]
+    },
+    "prepare_quest_context": {
+      "main": [[{"node": "generate_quest_structure", "type": "main", "index": 0}]]
+    },
+    "generate_quest_structure": {
+      "main": [[{"node": "process_quest_data", "type": "main", "index": 0}]]
+    },
+    "process_quest_data": {
+      "main": [[{"node": "generate_narratives", "type": "main", "index": 0}]]
+    },
+    "generate_narratives": {
+      "main": [[{"node": "cache_quest", "type": "main", "index": 0}]]
+    },
+    "cache_quest": {
+      "main": [[{"node": "create_quest_state", "type": "main", "index": 0}]]
+    },
+    "create_quest_state": {
+      "main": [[{"node": "webhook_response", "type": "main", "index": 0}]]
+    }
+  }
+}

@@ -1,0 +1,91 @@
+{
+  "worldInfo": {
+    "name": "The Enchanted Forest",
+    "version": "1.0.0",
+    "author": "You",
+    "description": "A magical forest adventure with ancient mysteries"
+  },
+  "startLocation": "forest_entrance",
+  "locations": {
+    "forest_entrance": {
+      "name": "🌲 Forest Entrance",
+      "description": "You stand at the edge of a mysterious enchanted forest. Ancient trees tower above you, their branches whispering secrets in the wind. A weathered signpost stands nearby.",
+      "choices": [
+        {
+          "text": "🚶 Enter the forest path",
+          "action": "move",
+          "target": "forest_path"
+        },
+        {
+          "text": "🔍 Examine the old signpost",
+          "action": "examine",
+          "target": "signpost"
+        }
+      ]
+    },
+    "forest_path": {
+      "name": "🌿 Forest Path",
+      "description": "You walk deeper into the forest. Sunlight filters through the canopy, creating dancing patterns on the moss-covered ground. The air smells of pine and magic.",
+      "choices": [
+        {
+          "text": "➡️ Continue deeper into the forest",
+          "action": "move",
+          "target": "deep_forest"
+        },
+        {
+          "text": "⬅️ Return to the entrance",
+          "action": "move", 
+          "target": "forest_entrance"
+        },
+        {
+          "text": "🔍 Search the bushes",
+          "action": "examine",
+          "target": "bushes"
+        }
+      ]
+    },
+    "deep_forest": {
+      "name": "✨ Heart of the Forest",
+      "description": "You've reached the heart of the forest. A crystal-clear stream bubbles nearby, and you notice something glittering in the water. Ancient runes are carved into a nearby oak tree.",
+      "choices": [
+        {
+          "text": "💎 Investigate the glittering object",
+          "action": "examine",
+          "target": "treasure"
+        },
+        {
+          "text": "💧 Drink from the stream",
+          "action": "special",
+          "target": "drink_stream"
+        },
+        {
+          "text": "📜 Examine the ancient runes",
+          "action": "examine",
+          "target": "runes"
+        },
+        {
+          "text": "🔙 Return to the path",
+          "action": "move",
+          "target": "forest_path"
+        }
+      ]
+    }
+  },
+  "items": {
+    "treasure": {
+      "name": "Ancient Medallion",
+      "description": "A beautiful golden medallion with mysterious runes that seem to glow with inner light"
+    },
+    "herb": {
+      "name": "Healing Herb",
+      "description": "A rare herb that sparkles with magical properties"
+    }
+  },
+  "specialActions": {
+    "signpost": "The weathered signpost reads: 'Beware! Magic dwells within these woods. Enter only if your heart is pure.'",
+    "drink_stream": "The crystal-clear water refreshes you completely. You feel energized and notice your vision has become sharper!",
+    "treasure": "You found an Ancient Medallion! It tingles with magical energy and seems to pulse with your heartbeat.",
+    "bushes": "You discover a rare Healing Herb hidden among the bushes! It glows softly in your hands.",
+    "runes": "The ancient runes tell the story of a great wizard who once protected this forest. The magic still lingers here..."
+  }
+}

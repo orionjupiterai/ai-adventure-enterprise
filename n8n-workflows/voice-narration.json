@@ -1,0 +1,208 @@
+{
+  "name": "Voice Narration with ElevenLabs & Google TTS",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "voice-narration",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook_trigger",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const data = items[0].json.body.data;\n\n// Map emotions to voice settings\nconst emotionSettings = {\n  neutral: { stability: 0.5, similarity_boost: 0.75 },\n  happy: { stability: 0.4, similarity_boost: 0.8, style: 0.3 },\n  sad: { stability: 0.7, similarity_boost: 0.7, style: -0.3 },\n  angry: { stability: 0.3, similarity_boost: 0.85, style: 0.5 },\n  excited: { stability: 0.2, similarity_boost: 0.9, style: 0.7 },\n  fearful: { stability: 0.8, similarity_boost: 0.6, style: -0.5 }\n};\n\n// Character voice mapping\nconst characterVoices = {\n  'narrator': 'EXAVITQu4vr4xnSDxMaL', // Bella - warm narrator\n  'hero': '21m00Tcm4TlvDq8ikWAM', // Josh - young hero\n  'villain': 'pNInz6obpgDQGcFmaJgB', // Adam - deep villain\n  'wise_elder': 'AZnzlk1XvdvUeBnXmlld', // Domi - wise\n  'default': 'EXAVITQu4vr4xnSDxMaL'\n};\n\nconst voiceId = data.voiceId || characterVoices[data.characterContext?.characterName] || characterVoices.default;\nconst emotion = data.emotion || 'neutral';\nconst settings = emotionSettings[emotion] || emotionSettings.neutral;\n\nreturn [{\n  json: {\n    text: data.text,\n    voiceId,\n    emotion,\n    speed: data.speed || 1.0,\n    provider: data.provider || 'elevenlabs',\n    fallbackProvider: data.fallbackProvider || 'google-tts',\n    voiceSettings: settings,\n    characterContext: data.characterContext\n  }\n}];"
+      },
+      "id": "prepare_voice_data",
+      "name": "Prepare Voice Data",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.provider }}",
+              "rightValue": "elevenlabs",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "route_provider",
+      "name": "Route Provider",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.elevenlabs.io/v1/text-to-speech/{{ $json.voiceId }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "xi-api-key",
+              "value": "{{$credentials.elevenLabsApiKey}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "requestMethod": "POST",
+        "jsonParameters": true,
+        "bodyParametersJson": "{\n  \"text\": \"{{ $json.text }}\",\n  \"model_id\": \"eleven_monolingual_v1\",\n  \"voice_settings\": {\n    \"stability\": {{ $json.voiceSettings.stability }},\n    \"similarity_boost\": {{ $json.voiceSettings.similarity_boost }},\n    \"style\": {{ $json.voiceSettings.style || 0 }},\n    \"use_speaker_boost\": true\n  }\n}",
+        "responseFormat": "file",
+        "outputPropertyName": "audioData",
+        "options": {}
+      },
+      "id": "elevenlabs_api",
+      "name": "ElevenLabs API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [850, 200]
+    },
+    {
+      "parameters": {
+        "url": "https://texttospeech.googleapis.com/v1/text:synthesize",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{$credentials.googleCloudAccessToken}}"
+            }
+          ]
+        },
+        "requestMethod": "POST",
+        "jsonParameters": true,
+        "bodyParametersJson": "{\n  \"input\": {\n    \"text\": \"{{ $json.text }}\"\n  },\n  \"voice\": {\n    \"languageCode\": \"en-US\",\n    \"name\": \"en-US-Neural2-C\",\n    \"ssmlGender\": \"MALE\"\n  },\n  \"audioConfig\": {\n    \"audioEncoding\": \"MP3\",\n    \"speakingRate\": {{ $json.speed }},\n    \"pitch\": 0\n  }\n}"
+      },
+      "id": "google_tts_fallback",
+      "name": "Google TTS Fallback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [850, 400]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Process audio data from either provider\nlet audioData, provider, format;\n\nif ($node['route_provider'].json.provider === 'elevenlabs') {\n  // ElevenLabs returns direct audio data\n  audioData = $binary.audioData;\n  provider = 'elevenlabs';\n  format = 'mp3';\n} else {\n  // Google TTS returns base64 encoded audio\n  const googleResponse = $json;\n  audioData = Buffer.from(googleResponse.audioContent, 'base64');\n  provider = 'google-tts';\n  format = 'mp3';\n}\n\n// Generate unique filename\nconst timestamp = Date.now();\nconst filename = `narration_${timestamp}_${provider}.${format}`;\n\n// Calculate duration estimate (rough)\nconst wordsPerMinute = 150;\nconst wordCount = $node['prepare_voice_data'].json.text.split(' ').length;\nconst duration = Math.ceil((wordCount / wordsPerMinute) * 60);\n\nreturn [{\n  json: {\n    filename,\n    provider,\n    format,\n    duration,\n    size: audioData.length || audioData.data.length,\n    metadata: {\n      voiceId: $node['prepare_voice_data'].json.voiceId,\n      emotion: $node['prepare_voice_data'].json.emotion,\n      speed: $node['prepare_voice_data'].json.speed,\n      characterContext: $node['prepare_voice_data'].json.characterContext\n    }\n  },\n  binary: {\n    audioFile: audioData\n  }\n}];"
+      },
+      "id": "process_audio",
+      "name": "Process Audio",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "bucketName": "{{$credentials.s3BucketName}}",
+        "fileName": "=voice/{{ $json.filename }}",
+        "binaryPropertyName": "audioFile",
+        "additionalFields": {
+          "acl": "public-read",
+          "storageClass": "STANDARD_IA"
+        },
+        "options": {}
+      },
+      "id": "upload_to_s3",
+      "name": "Upload to S3",
+      "type": "n8n-nodes-base.s3",
+      "typeVersion": 1,
+      "position": [1250, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "functionCode": "// Prepare final response\nlet audioUrl;\n\nif ($node['upload_to_s3'].json.success) {\n  // S3 upload successful\n  audioUrl = `https://${$credentials.s3BucketName}.s3.${$credentials.awsRegion}.amazonaws.com/voice/${$node['process_audio'].json.filename}`;\n} else {\n  // Fallback to local storage or temporary URL\n  audioUrl = `${process.env.API_URL}/temp/audio/${$node['process_audio'].json.filename}`;\n  \n  // Store temporarily in Redis with the audio data\n  // This would be handled by a separate workflow\n}\n\nreturn [{\n  json: {\n    audioUrl,\n    duration: $node['process_audio'].json.duration,\n    voiceId: $node['process_audio'].json.metadata.voiceId,\n    provider: $node['process_audio'].json.provider,\n    metadata: {\n      ....$node['process_audio'].json.metadata,\n      filename: $node['process_audio'].json.filename,\n      size: $node['process_audio'].json.size,\n      format: $node['process_audio'].json.format\n    }\n  }\n}];"
+      },
+      "id": "prepare_response",
+      "name": "Prepare Response",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1450, 300]
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "={{ 'voice:' + $json.metadata.voiceId + ':' + $node['prepare_voice_data'].json.text.substring(0, 50).replace(/[^a-zA-Z0-9]/g, '_') }}",
+        "value": "={{ JSON.stringify($json) }}",
+        "expire": true,
+        "ttl": 604800
+      },
+      "id": "cache_voice",
+      "name": "Cache Voice",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [1650, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "webhook_response",
+      "name": "Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1850, 300]
+    }
+  ],
+  "connections": {
+    "webhook_trigger": {
+      "main": [[{"node": "prepare_voice_data", "type": "main", "index": 0}]]
+    },
+    "prepare_voice_data": {
+      "main": [[{"node": "route_provider", "type": "main", "index": 0}]]
+    },
+    "route_provider": {
+      "main": [
+        [{"node": "elevenlabs_api", "type": "main", "index": 0}],
+        [{"node": "google_tts_fallback", "type": "main", "index": 0}]
+      ]
+    },
+    "elevenlabs_api": {
+      "main": [[{"node": "process_audio", "type": "main", "index": 0}]]
+    },
+    "google_tts_fallback": {
+      "main": [[{"node": "process_audio", "type": "main", "index": 0}]]
+    },
+    "process_audio": {
+      "main": [[{"node": "upload_to_s3", "type": "main", "index": 0}]]
+    },
+    "upload_to_s3": {
+      "main": [[{"node": "prepare_response", "type": "main", "index": 0}]]
+    },
+    "prepare_response": {
+      "main": [[{"node": "cache_voice", "type": "main", "index": 0}]]
+    },
+    "cache_voice": {
+      "main": [[{"node": "webhook_response", "type": "main", "index": 0}]]
+    }
+  }
+}

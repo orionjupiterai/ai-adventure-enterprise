@@ -1,0 +1,136 @@
+{
+  "name": "Grok NPC Dialogue Generator",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "grok-npc-dialogue",
+        "responseMode": "onReceived",
+        "responseData": "allEntries",
+        "options": {}
+      },
+      "id": "webhook_trigger",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Extract and validate input data\nconst data = items[0].json.body.data;\n\n// Build context for Grok\nconst systemPrompt = `You are ${data.npcName}, ${data.npcRole} in a fantasy adventure game.\nCurrent emotion: ${data.emotionalContext || 'neutral'}\nLocation: ${data.currentLocation}\n\nRespond in character with appropriate dialogue. Keep responses concise but flavorful.\nSuggest 2-3 possible player responses.`;\n\nconst userPrompt = `Player history: ${JSON.stringify(data.playerHistory.slice(-5))}\nGame state: ${JSON.stringify(data.gameState)}\n\nGenerate appropriate NPC dialogue for this interaction.`;\n\nreturn [{\n  json: {\n    systemPrompt,\n    userPrompt,\n    temperature: 0.8,\n    maxTokens: 300,\n    memoryKey: `npc_${data.npcName}_${data.currentLocation}`\n  }\n}];"
+      },
+      "id": "prepare_context",
+      "name": "Prepare Context",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://api.x.ai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{$credentials.xaiApiKey}}"
+            }
+          ]
+        },
+        "requestMethod": "POST",
+        "jsonParameters": true,
+        "bodyParametersJson": "{\n  \"model\": \"grok-beta\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"{{ $json.systemPrompt }}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"{{ $json.userPrompt }}\"\n    }\n  ],\n  \"temperature\": {{ $json.temperature }},\n  \"max_tokens\": {{ $json.maxTokens }}\n}",
+        "options": {}
+      },
+      "id": "grok_api_call",
+      "name": "xAI Grok API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "={{ $node['prepare_context'].json.memoryKey }}",
+        "value": "={{ $json.choices[0].message.content }}",
+        "expire": true,
+        "ttl": 1800
+      },
+      "id": "memory_persistence",
+      "name": "Store in Redis",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const grokResponse = items[0].json.choices[0].message.content;\n\n// Parse Grok response to extract dialogue and choices\nconst lines = grokResponse.split('\\n');\nlet dialogueText = '';\nlet suggestedChoices = [];\nlet isChoices = false;\n\nfor (const line of lines) {\n  if (line.includes('Player responses:') || line.includes('Choices:')) {\n    isChoices = true;\n    continue;\n  }\n  \n  if (isChoices && line.trim()) {\n    suggestedChoices.push(line.replace(/^[0-9\\.\\)\\-\\s]+/, '').trim());\n  } else if (!isChoices && line.trim()) {\n    dialogueText += line + ' ';\n  }\n}\n\n// Analyze emotion from dialogue\nconst emotionKeywords = {\n  happy: ['laugh', 'smile', 'joy', 'pleased', 'delighted'],\n  sad: ['sigh', 'tear', 'sorrow', 'melancholy'],\n  angry: ['growl', 'scowl', 'furious', 'rage'],\n  fearful: ['tremble', 'nervous', 'afraid', 'worried'],\n  excited: ['exclaim', 'eager', 'enthusiastic']\n};\n\nlet detectedEmotion = 'neutral';\nfor (const [emotion, keywords] of Object.entries(emotionKeywords)) {\n  if (keywords.some(keyword => dialogueText.toLowerCase().includes(keyword))) {\n    detectedEmotion = emotion;\n    break;\n  }\n}\n\nreturn [{\n  json: {\n    text: dialogueText.trim(),\n    emotion: detectedEmotion,\n    suggestedChoices: suggestedChoices.slice(0, 3),\n    metadata: {\n      model: 'grok-beta',\n      tokensUsed: items[0].json.usage.total_tokens,\n      timestamp: new Date().toISOString()\n    }\n  }\n}];"
+      },
+      "id": "format_response",
+      "name": "Format Response",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "requestId",
+              "value": "={{ $node['webhook_trigger'].json.body.requestId }}"
+            },
+            {
+              "name": "workflowId",
+              "value": "grok-npc-dialogue"
+            },
+            {
+              "name": "status",
+              "value": "success"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "add_metadata",
+      "name": "Add Metadata",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "webhook_response",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1450, 300]
+    }
+  ],
+  "connections": {
+    "webhook_trigger": {
+      "main": [[{"node": "prepare_context", "type": "main", "index": 0}]]
+    },
+    "prepare_context": {
+      "main": [[{"node": "grok_api_call", "type": "main", "index": 0}]]
+    },
+    "grok_api_call": {
+      "main": [[{"node": "memory_persistence", "type": "main", "index": 0}]]
+    },
+    "memory_persistence": {
+      "main": [[{"node": "format_response", "type": "main", "index": 0}]]
+    },
+    "format_response": {
+      "main": [[{"node": "add_metadata", "type": "main", "index": 0}]]
+    },
+    "add_metadata": {
+      "main": [[{"node": "webhook_response", "type": "main", "index": 0}]]
+    }
+  }
+}

@@ -1,0 +1,314 @@
+{
+  "name": "Story State Change Image Generation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "story-image-trigger",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "story_state_trigger",
+      "name": "Story state change trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Extract story state change data and generate optimized image prompt\nconst storyData = items[0].json.body;\n\n// Validate required fields\nif (!storyData.storyId || !storyData.changeType) {\n  throw new Error('Missing required fields: storyId and changeType');\n}\n\n// Story change types that trigger image generation\nconst imageWorthyChanges = [\n  'location_change',\n  'major_event',\n  'boss_encounter',\n  'puzzle_solved',\n  'chapter_start',\n  'dramatic_reveal',\n  'environment_shift'\n];\n\nif (!imageWorthyChanges.includes(storyData.changeType)) {\n  throw new Error(`Change type ${storyData.changeType} does not require image generation`);\n}\n\n// Build comprehensive scene context\nconst sceneContext = {\n  // Story Information\n  storyId: storyData.storyId,\n  chapterId: storyData.chapterId || 'chapter_1',\n  sceneId: storyData.sceneId || crypto.randomUUID(),\n  changeType: storyData.changeType,\n  \n  // Visual Elements\n  location: storyData.location || 'mysterious location',\n  timeOfDay: storyData.timeOfDay || 'day',\n  weather: storyData.weather || 'clear',\n  mood: storyData.mood || 'neutral',\n  \n  // Characters Present\n  characters: storyData.characters || [],\n  protagonist: storyData.protagonist || { name: 'Hero', appearance: 'adventurer' },\n  \n  // World Style\n  worldTheme: storyData.worldTheme || 'fantasy',\n  artStyle: storyData.artStyle || 'digital painting',\n  colorPalette: storyData.colorPalette || 'vibrant',\n  \n  // Story Context\n  previousScene: storyData.previousScene || '',\n  currentNarrative: storyData.narrative || '',\n  emotionalTone: storyData.emotionalTone || 'neutral'\n};\n\n// Generate optimized prompts for different providers\nconst promptGenerator = {\n  // Enhanced prompt for Midjourney\n  midjourney: () => {\n    const styleModifiers = {\n      fantasy: 'fantasy art, magical atmosphere, ethereal lighting',\n      scifi: 'science fiction, futuristic, cyberpunk aesthetics',\n      horror: 'dark fantasy, gothic horror, atmospheric dread',\n      historical: 'historical accuracy, period appropriate, classical art',\n      modern: 'contemporary setting, photorealistic, urban environment'\n    };\n    \n    const moodLighting = {\n      dramatic: 'dramatic lighting, high contrast, cinematic',\n      peaceful: 'soft lighting, serene atmosphere, tranquil',\n      tense: 'harsh shadows, ominous atmosphere, suspenseful',\n      joyful: 'bright colors, warm lighting, cheerful atmosphere',\n      mysterious: 'fog, dim lighting, enigmatic shadows'\n    };\n    \n    const timeOfDayLighting = {\n      dawn: 'golden hour, sunrise colors, morning mist',\n      day: 'natural daylight, clear visibility',\n      dusk: 'sunset colors, long shadows, twilight',\n      night: 'moonlight, stars visible, nocturnal atmosphere'\n    };\n    \n    // Build the prompt\n    let prompt = `${sceneContext.currentNarrative || sceneContext.location}, `;\n    prompt += `${styleModifiers[sceneContext.worldTheme] || styleModifiers.fantasy}, `;\n    prompt += `${moodLighting[sceneContext.mood] || moodLighting.dramatic}, `;\n    prompt += `${timeOfDayLighting[sceneContext.timeOfDay] || timeOfDayLighting.day}, `;\n    prompt += `${sceneContext.artStyle}, highly detailed, artstation quality`;\n    \n    // Add character descriptions if present\n    if (sceneContext.characters.length > 0) {\n      const charDesc = sceneContext.characters.slice(0, 2).map(c => c.appearance).join(', ');\n      prompt += `, featuring ${charDesc}`;\n    }\n    \n    // Add Midjourney parameters\n    const aspectRatio = storyData.aspectRatio || '16:9';\n    const quality = storyData.quality || 'high';\n    \n    prompt += ` --ar ${aspectRatio}`;\n    prompt += quality === 'high' ? ' --quality 2' : ' --quality 1';\n    prompt += ' --style raw --v 6';\n    \n    return prompt;\n  },\n  \n  // Optimized prompt for Grok\n  grok: () => {\n    let prompt = `Create a ${sceneContext.artStyle} image of: `;\n    prompt += `${sceneContext.currentNarrative || sceneContext.location}. `;\n    prompt += `The scene is set in a ${sceneContext.worldTheme} world during ${sceneContext.timeOfDay}. `;\n    prompt += `The mood should be ${sceneContext.mood} with ${sceneContext.emotionalTone} emotional undertones. `;\n    \n    if (sceneContext.weather !== 'clear') {\n      prompt += `Weather: ${sceneContext.weather}. `;\n    }\n    \n    if (sceneContext.characters.length > 0) {\n      prompt += `Characters in scene: ${sceneContext.characters.map(c => c.name).join(', ')}. `;\n    }\n    \n    prompt += `Art style: ${sceneContext.artStyle}, ${sceneContext.colorPalette} colors.`;\n    \n    return prompt;\n  },\n  \n  // Generic prompt for other providers\n  generic: () => {\n    return `${sceneContext.worldTheme} scene: ${sceneContext.currentNarrative || sceneContext.location}, ${sceneContext.artStyle} style, ${sceneContext.mood} mood`;\n  }\n};\n\n// Generate prompts for each provider\nconst prompts = {\n  midjourney: promptGenerator.midjourney(),\n  grok: promptGenerator.grok(),\n  generic: promptGenerator.generic()\n};\n\n// Prepare cache key based on scene elements\nconst cacheKey = `scene:${sceneContext.storyId}:${sceneContext.changeType}:${sceneContext.location.replace(/[^a-zA-Z0-9]/g, '_')}`;\n\nreturn [{\n  json: {\n    sceneContext,\n    prompts,\n    cacheKey,\n    originalData: storyData,\n    metadata: {\n      requestId: crypto.randomUUID(),\n      timestamp: new Date().toISOString(),\n      priority: storyData.priority || 'normal'\n    }\n  }\n}];"
+      },
+      "id": "generate_image_prompt",
+      "name": "Generate image prompt",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "key": "={{ $json.cacheKey }}",
+        "options": {}
+      },
+      "id": "check_cache",
+      "name": "Check Cache",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [650, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.value }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "cache_found",
+      "name": "Cache Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Return cached image data\nconst cachedData = JSON.parse($json.value);\n\n// Update cache hit metadata\ncachedData.metadata.cacheHit = true;\ncachedData.metadata.cachedAt = cachedData.metadata.timestamp;\ncachedData.metadata.timestamp = new Date().toISOString();\ncachedData.metadata.ttlRemaining = $json.ttl || 'unknown';\n\nreturn [{\n  json: cachedData\n}];"
+      },
+      "id": "return_cached",
+      "name": "Return Cached Image",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "url": "https://discord.com/api/v10/interactions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bot {{$credentials.discordBotToken}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "requestMethod": "POST",
+        "jsonParameters": true,
+        "bodyParametersJson": "{\n  \"type\": 2,\n  \"application_id\": \"{{$credentials.midjourneyAppId}}\",\n  \"guild_id\": \"{{$credentials.discordGuildId}}\",\n  \"channel_id\": \"{{$credentials.discordChannelId}}\",\n  \"session_id\": \"{{ $node['generate_image_prompt'].json.metadata.requestId }}\",\n  \"data\": {\n    \"version\": \"1166847114203123795\",\n    \"id\": \"938956540159881230\",\n    \"name\": \"imagine\",\n    \"type\": 1,\n    \"options\": [\n      {\n        \"type\": 3,\n        \"name\": \"prompt\",\n        \"value\": \"{{ $node['generate_image_prompt'].json.prompts.midjourney }}\"\n      }\n    ],\n    \"application_command\": {\n      \"id\": \"938956540159881230\",\n      \"type\": 1,\n      \"application_id\": \"936929561302675456\",\n      \"version\": \"1166847114203123795\",\n      \"name\": \"imagine\",\n      \"description\": \"Create images from a text prompt\",\n      \"options\": [\n        {\n          \"type\": 3,\n          \"name\": \"prompt\",\n          \"description\": \"The prompt to imagine\",\n          \"required\": true\n        }\n      ]\n    },\n    \"attachments\": []\n  }\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "try_midjourney_api",
+      "name": "Try Midjourney API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [1050, 400],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "functionCode": "// Check if Midjourney request was successful\nconst midjourneyResponse = $node['try_midjourney_api'].json;\nconst midjourneyError = $node['try_midjourney_api'].error;\n\nif (!midjourneyError && midjourneyResponse && !midjourneyResponse.error) {\n  // Midjourney request initiated successfully\n  // Store job info for webhook callback\n  const jobId = $node['generate_image_prompt'].json.metadata.requestId;\n  const jobData = {\n    provider: 'midjourney',\n    status: 'processing',\n    jobId: jobId,\n    prompt: $node['generate_image_prompt'].json.prompts.midjourney,\n    startTime: Date.now(),\n    webhookUrl: `${process.env.N8N_BASE_URL}/webhook-waiting/midjourney-image/${jobId}`,\n    sceneContext: $node['generate_image_prompt'].json.sceneContext\n  };\n  \n  return [{\n    json: {\n      success: true,\n      provider: 'midjourney',\n      jobData\n    }\n  }];\n} else {\n  // Midjourney failed, prepare for fallback\n  const errorDetails = midjourneyError || midjourneyResponse?.error || 'Unknown error';\n  console.error('Midjourney API failed:', errorDetails);\n  \n  return [{\n    json: {\n      success: false,\n      provider: 'midjourney',\n      error: errorDetails,\n      fallbackRequired: true\n    }\n  }];\n}"
+      },
+      "id": "check_midjourney_status",
+      "name": "Check Midjourney Status",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1250, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.success }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "midjourney_success",
+      "name": "Midjourney Success?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1450, 400]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Wait for Midjourney to process (webhook or polling)\n// In production, this would be handled by a separate webhook endpoint\n// For this example, we'll simulate the wait and return a placeholder\n\nconst jobData = $json.jobData;\nconst maxWaitTime = 120000; // 2 minutes\nconst checkInterval = 5000; // 5 seconds\n\n// Simulate waiting for Midjourney result\n// In real implementation, this would check Redis for webhook callback data\nconst mockMidjourneyResult = {\n  imageUrl: `https://cdn.midjourney.com/generated/${jobData.jobId}_1.png`,\n  thumbnailUrl: `https://cdn.midjourney.com/generated/${jobData.jobId}_1_thumb.png`,\n  provider: 'midjourney',\n  jobId: jobData.jobId,\n  prompt: jobData.prompt,\n  processingTime: 45000, // 45 seconds average\n  metadata: {\n    grid: false,\n    upscaled: true,\n    variations: [\n      `https://cdn.midjourney.com/generated/${jobData.jobId}_v1.png`,\n      `https://cdn.midjourney.com/generated/${jobData.jobId}_v2.png`\n    ],\n    settings: {\n      model: 'v6',\n      quality: 2,\n      stylize: 100\n    }\n  }\n};\n\n// In production, implement actual waiting logic:\n// 1. Store job in Redis with webhook callback URL\n// 2. Discord bot sends webhook when image is ready\n// 3. Retrieve result from Redis\n\nreturn [{\n  json: {\n    success: true,\n    ...mockMidjourneyResult,\n    sceneContext: jobData.sceneContext,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "wait_for_midjourney",
+      "name": "Wait for Midjourney Result",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1650, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://api.x.ai/v1/images/generations",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{$credentials.xaiApiKey}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "requestMethod": "POST",
+        "jsonParameters": true,
+        "bodyParametersJson": "{\n  \"model\": \"grok-vision-beta\",\n  \"prompt\": \"{{ $node['generate_image_prompt'].json.prompts.grok }}\",\n  \"n\": 1,\n  \"size\": \"1024x1024\",\n  \"quality\": \"standard\",\n  \"style\": \"vivid\",\n  \"response_format\": \"url\"\n}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "try_grok_image",
+      "name": "Try Grok Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [1650, 500],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "functionCode": "// Process the image generation result from either provider\nlet imageResult = {};\nlet success = false;\n\n// Check if we have a Midjourney result\nif ($node['midjourney_success'].json.success === true) {\n  // Process Midjourney result\n  const mjResult = $node['wait_for_midjourney'].json;\n  imageResult = {\n    success: true,\n    provider: 'midjourney',\n    imageUrl: mjResult.imageUrl,\n    thumbnailUrl: mjResult.thumbnailUrl,\n    variations: mjResult.metadata?.variations || [],\n    prompt: mjResult.prompt,\n    processingTime: mjResult.processingTime,\n    metadata: {\n      ...mjResult.metadata,\n      sceneContext: mjResult.sceneContext\n    }\n  };\n  success = true;\n} else {\n  // Check Grok fallback result\n  const grokResponse = $node['try_grok_image'].json;\n  const grokError = $node['try_grok_image'].error;\n  \n  if (!grokError && grokResponse && grokResponse.data && grokResponse.data[0]) {\n    // Grok succeeded\n    const grokImage = grokResponse.data[0];\n    imageResult = {\n      success: true,\n      provider: 'grok',\n      imageUrl: grokImage.url || grokImage.b64_json,\n      thumbnailUrl: grokImage.url || grokImage.b64_json,\n      variations: [],\n      prompt: $node['generate_image_prompt'].json.prompts.grok,\n      processingTime: Date.now() - new Date($node['generate_image_prompt'].json.metadata.timestamp).getTime(),\n      metadata: {\n        revised_prompt: grokImage.revised_prompt,\n        model: 'grok-vision-beta',\n        sceneContext: $node['generate_image_prompt'].json.sceneContext\n      }\n    };\n    success = true;\n  } else {\n    // Both providers failed\n    imageResult = {\n      success: false,\n      error: {\n        message: 'Both image generation providers failed',\n        midjourney: $node['check_midjourney_status'].json.error,\n        grok: grokError || grokResponse?.error || 'Unknown error'\n      },\n      fallbackUrl: generateFallbackImage($node['generate_image_prompt'].json.sceneContext),\n      metadata: {\n        sceneContext: $node['generate_image_prompt'].json.sceneContext\n      }\n    };\n  }\n}\n\n// Helper function to generate fallback image URL\nfunction generateFallbackImage(context) {\n  // Generate a placeholder image based on scene context\n  const theme = context.worldTheme || 'fantasy';\n  const mood = context.mood || 'neutral';\n  const colors = {\n    fantasy: '1a1a2e,16213e,0f3460,e94560',\n    scifi: '000000,1a1a1a,4a4a4a,00ff00',\n    horror: '000000,1a0000,4a0000,ff0000',\n    modern: '2c3e50,34495e,7f8c8d,ecf0f1'\n  };\n  \n  const colorScheme = colors[theme] || colors.fantasy;\n  const text = encodeURIComponent(`${context.location || 'Scene'} - ${mood}`);\n  \n  return `https://via.placeholder.com/1024x576/${colorScheme}/ffffff?text=${text}`;\n}\n\n// Add common metadata\nimageResult.metadata = {\n  ...imageResult.metadata,\n  requestId: $node['generate_image_prompt'].json.metadata.requestId,\n  timestamp: new Date().toISOString(),\n  cacheKey: $node['generate_image_prompt'].json.cacheKey,\n  storyId: $node['generate_image_prompt'].json.sceneContext.storyId,\n  chapterId: $node['generate_image_prompt'].json.sceneContext.chapterId,\n  sceneId: $node['generate_image_prompt'].json.sceneContext.sceneId,\n  changeType: $node['generate_image_prompt'].json.sceneContext.changeType\n};\n\nreturn [{\n  json: imageResult\n}];"
+      },
+      "id": "process_image_result",
+      "name": "Process Image Result",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1850, 400]
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "={{ $json.metadata.cacheKey }}",
+        "value": "={{ JSON.stringify($json) }}",
+        "expire": true,
+        "ttl": 86400,
+        "options": {}
+      },
+      "id": "cache_and_return",
+      "name": "Cache and return image URL",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [2050, 400],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "functionCode": "// Store image metadata in database for future reference\nconst imageData = $node['process_image_result'].json;\n\n// Prepare database record\nconst dbRecord = {\n  id: imageData.metadata.requestId,\n  storyId: imageData.metadata.storyId,\n  chapterId: imageData.metadata.chapterId,\n  sceneId: imageData.metadata.sceneId,\n  changeType: imageData.metadata.changeType,\n  imageUrl: imageData.imageUrl || imageData.fallbackUrl,\n  thumbnailUrl: imageData.thumbnailUrl || imageData.imageUrl || imageData.fallbackUrl,\n  provider: imageData.provider || 'fallback',\n  prompt: imageData.prompt || 'N/A',\n  processingTime: imageData.processingTime || 0,\n  success: imageData.success,\n  createdAt: imageData.metadata.timestamp,\n  metadata: JSON.stringify(imageData.metadata)\n};\n\n// In production, this would insert into PostgreSQL\n// For now, we'll just prepare the response\n\nreturn [{\n  json: {\n    ...imageData,\n    dbRecord: dbRecord,\n    cached: $node['cache_and_return'].json.success || false\n  }\n}];"
+      },
+      "id": "store_metadata",
+      "name": "Store Image Metadata",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [2250, 400]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({\n  success: $json.success,\n  imageUrl: $json.imageUrl || $json.fallbackUrl,\n  thumbnailUrl: $json.thumbnailUrl || $json.imageUrl || $json.fallbackUrl,\n  provider: $json.provider || 'fallback',\n  variations: $json.variations || [],\n  metadata: {\n    requestId: $json.metadata.requestId,\n    storyId: $json.metadata.storyId,\n    chapterId: $json.metadata.chapterId,\n    sceneId: $json.metadata.sceneId,\n    changeType: $json.metadata.changeType,\n    processingTime: $json.processingTime,\n    cached: $json.cached,\n    cacheHit: $json.metadata.cacheHit || false\n  },\n  error: $json.error || null\n}) }}",
+        "responseCode": "={{ $json.success ? 200 : 500 }}",
+        "responseHeaders": {
+          "entries": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Image-Provider",
+              "value": "={{ $json.provider || 'fallback' }}"
+            },
+            {
+              "name": "X-Cache-Status",
+              "value": "={{ $json.metadata.cacheHit ? 'HIT' : 'MISS' }}"
+            },
+            {
+              "name": "X-Request-ID",
+              "value": "={{ $json.metadata.requestId }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "webhook_response",
+      "name": "Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [2450, 400]
+    }
+  ],
+  "connections": {
+    "story_state_trigger": {
+      "main": [[{"node": "generate_image_prompt", "type": "main", "index": 0}]]
+    },
+    "generate_image_prompt": {
+      "main": [[{"node": "check_cache", "type": "main", "index": 0}]]
+    },
+    "check_cache": {
+      "main": [[{"node": "cache_found", "type": "main", "index": 0}]]
+    },
+    "cache_found": {
+      "main": [
+        [{"node": "return_cached", "type": "main", "index": 0}],
+        [{"node": "try_midjourney_api", "type": "main", "index": 0}]
+      ]
+    },
+    "return_cached": {
+      "main": [[{"node": "webhook_response", "type": "main", "index": 0}]]
+    },
+    "try_midjourney_api": {
+      "main": [[{"node": "check_midjourney_status", "type": "main", "index": 0}]]
+    },
+    "check_midjourney_status": {
+      "main": [[{"node": "midjourney_success", "type": "main", "index": 0}]]
+    },
+    "midjourney_success": {
+      "main": [
+        [{"node": "wait_for_midjourney", "type": "main", "index": 0}],
+        [{"node": "try_grok_image", "type": "main", "index": 0}]
+      ]
+    },
+    "wait_for_midjourney": {
+      "main": [[{"node": "process_image_result", "type": "main", "index": 0}]]
+    },
+    "try_grok_image": {
+      "main": [[{"node": "process_image_result", "type": "main", "index": 0}]]
+    },
+    "process_image_result": {
+      "main": [[{"node": "cache_and_return", "type": "main", "index": 0}]]
+    },
+    "cache_and_return": {
+      "main": [[{"node": "store_metadata", "type": "main", "index": 0}]]
+    },
+    "store_metadata": {
+      "main": [[{"node": "webhook_response", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "all",
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  }
+}
