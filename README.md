@@ -1,4 +1,4 @@
-# Adventure Platform Pro
+# AI Adventure Enterprise
 
 A comprehensive choose-your-own-adventure platform with AI integration, multiplayer capabilities, and cross-platform support.
 
@@ -37,8 +37,8 @@ A comprehensive choose-your-own-adventure platform with AI integration, multipla
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/adventure-platform-pro.git
-cd adventure-platform-pro
+git clone https://github.com/orionjupiterai/ai-adventure-enterprise.git
+cd ai-adventure-enterprise
 ```
 
 2. Copy environment variables:
