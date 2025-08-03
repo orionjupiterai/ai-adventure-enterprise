@@ -1,0 +1,125 @@
+version: '3.8'
+
+services:
+  # Frontend React App
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../infrastructure/docker/Dockerfile.frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - REACT_APP_API_URL=http://localhost:3001
+      - REACT_APP_WS_URL=ws://localhost:3001
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - rpg-network
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://rpguser:rpgpass@postgres:5432/immersive_rpg
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=your-dev-jwt-secret
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - rpg-network
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=rpguser
+      - POSTGRES_PASSWORD=rpgpass
+      - POSTGRES_DB=immersive_rpg
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schemas:/docker-entrypoint-initdb.d
+    networks:
+      - rpg-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - rpg-network
+
+  # World Generator Service
+  world-generator:
+    build:
+      context: ./ai-services/world-generator
+      dockerfile: Dockerfile
+    environment:
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY}
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+    networks:
+      - rpg-network
+
+  # Narrative Engine Service
+  narrative-engine:
+    build:
+      context: ./ai-services/narrative-engine
+      dockerfile: Dockerfile
+    environment:
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY}
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+    networks:
+      - rpg-network
+
+  # Balance Engine Service
+  balance-engine:
+    build:
+      context: ./ai-services/balance-engine
+      dockerfile: Dockerfile
+    environment:
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+    networks:
+      - rpg-network
+
+  # Adminer (Database UI)
+  adminer:
+    image: adminer
+    ports:
+      - "8080:8080"
+    environment:
+      - ADMINER_DEFAULT_SERVER=postgres
+    networks:
+      - rpg-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  rpg-network:
+    driver: bridge

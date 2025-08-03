@@ -1,0 +1,27 @@
+{
+  "short_name": "AI RPG",
+  "name": "Immersive AI RPG",
+  "description": "Dynamic AI-powered role-playing game",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "/assets/images/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/assets/images/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#8B5CF6",
+  "background_color": "#020617",
+  "orientation": "landscape"
+}

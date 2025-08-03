@@ -1,0 +1,57 @@
+{
+  "name": "immersive-ai-rpg-backend",
+  "version": "1.0.0",
+  "description": "Backend API for Immersive AI RPG",
+  "main": "src/app.js",
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon src/app.js",
+    "dev:minimal": "nodemon src/app-minimal.js",
+    "start": "node src/app.js",
+    "start:minimal": "node src/app-minimal.js",
+    "test": "jest --coverage",
+    "test:watch": "jest --watch",
+    "lint": "eslint src --ext .js",
+    "format": "prettier --write \"src/**/*.js\"",
+    "migrate": "node scripts/migrate.js",
+    "seed": "node scripts/seed.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "compression": "^1.7.4",
+    "dotenv": "^16.3.1",
+    "joi": "^17.11.0",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "express-rate-limit": "^7.1.5",
+    "socket.io": "^4.7.2",
+    "axios": "^1.6.2",
+    "openai": "^4.24.1",
+    "@anthropic-ai/sdk": "^0.10.0",
+    "@supabase/supabase-js": "^2.39.1",
+    "redis": "^4.6.11",
+    "bull": "^4.11.5",
+    "winston": "^3.11.0",
+    "morgan": "^1.10.0",
+    "multer": "^1.4.5-lts.1",
+    "sharp": "^0.33.1",
+    "cloudinary": "^1.41.1",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2",
+    "jest": "^29.7.0",
+    "supertest": "^6.3.3",
+    "eslint": "^8.56.0",
+    "eslint-config-airbnb-base": "^15.0.0",
+    "eslint-plugin-import": "^2.29.1",
+    "prettier": "^3.1.1",
+    "@types/node": "^20.10.5"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}

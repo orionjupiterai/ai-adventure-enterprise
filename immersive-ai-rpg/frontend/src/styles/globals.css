@@ -1,0 +1,210 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-primary: 139 92 246;
+    --color-secondary: 59 130 246;
+    --color-accent: 245 158 11;
+    --color-success: 16 185 129;
+    --color-danger: 239 68 68;
+    --color-warning: 245 158 11;
+    --color-dark: 15 23 42;
+    --color-darker: 2 6 23;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-game-dark-300 text-white font-ui;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-game;
+  }
+
+  code, pre {
+    @apply font-mono;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply px-4 py-2 rounded-lg font-medium transition-all duration-200;
+    @apply hover:scale-105 active:scale-95;
+  }
+
+  .btn-primary {
+    @apply btn bg-game-primary hover:bg-purple-700 text-white;
+    @apply shadow-lg shadow-purple-500/25;
+  }
+
+  .btn-secondary {
+    @apply btn bg-game-secondary hover:bg-blue-700 text-white;
+    @apply shadow-lg shadow-blue-500/25;
+  }
+
+  .btn-danger {
+    @apply btn bg-game-danger hover:bg-red-700 text-white;
+    @apply shadow-lg shadow-red-500/25;
+  }
+
+  .card {
+    @apply bg-game-dark-100 rounded-xl p-6 border border-gray-800;
+    @apply shadow-xl hover:shadow-2xl transition-shadow duration-300;
+  }
+
+  .input {
+    @apply w-full px-4 py-2 rounded-lg bg-game-dark-200 border border-gray-700;
+    @apply focus:outline-none focus:border-game-primary focus:ring-2 focus:ring-game-primary/50;
+    @apply transition-all duration-200;
+  }
+
+  .game-container {
+    @apply container mx-auto px-4 py-8 max-w-7xl;
+  }
+
+  .health-bar {
+    @apply relative h-6 bg-gray-800 rounded-full overflow-hidden;
+  }
+
+  .health-bar-fill {
+    @apply absolute inset-y-0 left-0 bg-gradient-to-r from-red-600 to-red-500;
+    @apply transition-all duration-500 ease-out;
+  }
+
+  .mana-bar {
+    @apply relative h-6 bg-gray-800 rounded-full overflow-hidden;
+  }
+
+  .mana-bar-fill {
+    @apply absolute inset-y-0 left-0 bg-gradient-to-r from-blue-600 to-blue-500;
+    @apply transition-all duration-500 ease-out;
+  }
+
+  .xp-bar {
+    @apply relative h-4 bg-gray-800 rounded-full overflow-hidden;
+  }
+
+  .xp-bar-fill {
+    @apply absolute inset-y-0 left-0 bg-gradient-to-r from-yellow-600 to-yellow-500;
+    @apply transition-all duration-500 ease-out;
+  }
+
+  .dialogue-box {
+    @apply bg-game-dark-100/95 backdrop-blur-sm rounded-lg p-6;
+    @apply border border-gray-700 shadow-2xl;
+  }
+
+  .inventory-slot {
+    @apply w-16 h-16 bg-game-dark-200 rounded-lg border-2 border-gray-700;
+    @apply hover:border-game-primary transition-colors duration-200;
+    @apply flex items-center justify-center cursor-pointer;
+  }
+
+  .inventory-slot.occupied {
+    @apply border-game-accent;
+  }
+
+  .tooltip {
+    @apply absolute z-50 px-3 py-2 text-sm bg-game-dark-100 rounded-lg;
+    @apply border border-gray-700 shadow-xl pointer-events-none;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-game-primary to-game-secondary;
+  }
+
+  .glow-primary {
+    @apply shadow-lg shadow-purple-500/50;
+  }
+
+  .glow-secondary {
+    @apply shadow-lg shadow-blue-500/50;
+  }
+
+  .glow-accent {
+    @apply shadow-lg shadow-yellow-500/50;
+  }
+
+  .pixelated {
+    image-rendering: pixelated;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: crisp-edges;
+  }
+
+  .scene-transition {
+    @apply transition-all duration-700 ease-in-out;
+  }
+
+  .combat-shake {
+    animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+  }
+
+  .float-animation {
+    animation: float 3s ease-in-out infinite;
+  }
+
+  .pulse-glow {
+    animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.5);
+  }
+  50% {
+    opacity: 0.8;
+    box-shadow: 0 0 30px rgba(139, 92, 246, 0.8);
+  }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-game-dark-200;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-game-primary rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-purple-700;
+}
+
+/* Loading animations */
+.loading-dots span {
+  animation: loading 1.4s infinite both;
+}
+
+.loading-dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.loading-dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes loading {
+  0%, 80%, 100% {
+    transform: scale(0);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
