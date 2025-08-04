@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Adventure Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        #bgVideo {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            min-width: 100%;
+            min-height: 100%;
+            width: auto;
+            height: auto;
+            z-index: -1;
+            transform: translateX(-50%) translateY(-50%);
+            background-size: cover;
+            object-fit: cover;
+        }
+    </style>
+</head>
+<body class="overflow-hidden">
+    <!-- Video Background - Full Screen -->
+    <video id="bgVideo" autoplay muted loop playsinline>
+        <source src="videos/1.mp4" type="video/mp4">
+        Your browser does not support the video tag.
+    </video>
+
+    <!-- Dark overlay -->
+    <div class="fixed inset-0 bg-black bg-opacity-40 z-0"></div>
+
+    <!-- Content -->
+    <div class="relative z-10 min-h-screen flex flex-col items-center justify-center px-4">
+        <!-- Title -->
+        <h1 class="text-5xl md:text-7xl font-bold text-white mb-12 text-center drop-shadow-2xl">
+            AI Adventure Platform
+        </h1>
+
+        <!-- Login Form -->
+        <div class="w-full max-w-md">
+            <form id="loginForm" class="bg-black bg-opacity-50 backdrop-blur-md shadow-2xl rounded-lg px-8 pt-6 pb-8 mb-4 border border-white/10">
+                <div class="mb-6">
+                    <label class="block text-white text-sm font-bold mb-2" for="email">
+                        Email
+                    </label>
+                    <input class="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" 
+                           id="email" 
+                           type="email" 
+                           placeholder="Enter your email"
+                           required>
+                </div>
+                <div class="mb-6">
+                    <label class="block text-white text-sm font-bold mb-2" for="password">
+                        Password
+                    </label>
+                    <input class="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline" 
+                           id="password" 
+                           type="password" 
+                           placeholder="Enter your password"
+                           required>
+                </div>
+                <div class="flex items-center justify-between">
+                    <button class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded focus:outline-none focus:shadow-outline transition duration-300" 
+                            type="submit">
+                        Sign In
+                    </button>
+                </div>
+                <div class="text-center mt-6">
+                    <button type="button" class="text-sm text-gray-300 hover:text-white transition duration-300" onclick="fillDemo()">
+                        Use Demo Account
+                    </button>
+                </div>
+            </form>
+            <p class="text-center text-gray-300 text-xs">
+                &copy;2025 AI Adventure Platform. All rights reserved.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // Array of video files
+        const videos = ['1.mp4', '2.mp4', '3.mp4', '4.mp4', '5.mp4', '6.mp4'];
+        
+        // Get random video
+        const randomVideo = videos[Math.floor(Math.random() * videos.length)];
+        
+        // Set video source
+        document.getElementById('bgVideo').src = 'videos/' + randomVideo;
+        
+        // Fill demo credentials
+        function fillDemo() {
+            document.getElementById('email').value = 'demo@immersive-rpg.com';
+            document.getElementById('password').value = 'DemoAccount123!';
+        }
+        
+        // Handle form submission
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            if (email === 'demo@immersive-rpg.com' && password === 'DemoAccount123!') {
+                window.location.href = 'game.html';
+            } else {
+                alert('Please use the demo account for now');
+            }
+        });
+    </script>
+</body>
+</html>

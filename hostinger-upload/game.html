@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Adventure - Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-white">
+    <!-- Header -->
+    <header class="bg-gray-800 shadow-lg">
+        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <h1 class="text-2xl font-bold">AI Adventure Platform</h1>
+            <div class="flex items-center space-x-4">
+                <span id="userName" class="text-sm">Welcome!</span>
+                <button onclick="logout()" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded text-sm transition">
+                    Logout
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Game Container -->
+    <main class="container mx-auto px-4 py-8">
+        <div class="max-w-4xl mx-auto">
+            <!-- Game Status -->
+            <div class="bg-gray-800 rounded-lg p-6 mb-6">
+                <h2 class="text-xl font-bold mb-4">Your Adventure Awaits</h2>
+                <p class="text-gray-300 mb-4">
+                    Welcome to the AI Adventure Platform! Choose your path and begin your journey.
+                </p>
+                
+                <!-- Game Options -->
+                <div class="grid md:grid-cols-3 gap-4 mt-6">
+                    <button onclick="startNewGame()" class="bg-indigo-600 hover:bg-indigo-700 p-6 rounded-lg transition transform hover:scale-105">
+                        <div class="text-3xl mb-2">🎮</div>
+                        <h3 class="font-bold">New Game</h3>
+                        <p class="text-sm mt-2">Start a fresh adventure</p>
+                    </button>
+                    
+                    <button onclick="continueGame()" class="bg-green-600 hover:bg-green-700 p-6 rounded-lg transition transform hover:scale-105">
+                        <div class="text-3xl mb-2">📖</div>
+                        <h3 class="font-bold">Continue</h3>
+                        <p class="text-sm mt-2">Resume your journey</p>
+                    </button>
+                    
+                    <button onclick="showWorlds()" class="bg-purple-600 hover:bg-purple-700 p-6 rounded-lg transition transform hover:scale-105">
+                        <div class="text-3xl mb-2">🌍</div>
+                        <h3 class="font-bold">Browse Worlds</h3>
+                        <p class="text-sm mt-2">Explore available worlds</p>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Game Area (Hidden by default) -->
+            <div id="gameArea" class="hidden bg-gray-800 rounded-lg p-6">
+                <div id="gameContent" class="prose prose-invert max-w-none">
+                    <!-- Game content will be loaded here -->
+                </div>
+                
+                <!-- Game Controls -->
+                <div id="gameControls" class="mt-6 space-y-4">
+                    <!-- Dynamic controls will be added here -->
+                </div>
+            </div>
+
+            <!-- Loading State -->
+            <div id="loadingState" class="hidden text-center py-12">
+                <svg class="animate-spin h-12 w-12 text-indigo-600 mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p class="text-gray-400">Loading your adventure...</p>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Check authentication
+        function checkAuth() {
+            const token = localStorage.getItem('token');
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            
+            if (!token) {
+                window.location.href = '/';
+                return;
+            }
+            
+            // Display user name
+            document.getElementById('userName').textContent = `Welcome, ${user.name || user.email || 'Adventurer'}!`;
+        }
+
+        // Logout function
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/';
+        }
+
+        // Game functions
+        function startNewGame() {
+            showLoading();
+            document.getElementById('gameArea').classList.remove('hidden');
+            
+            // Simulate game loading
+            setTimeout(() => {
+                hideLoading();
+                document.getElementById('gameContent').innerHTML = `
+                    <h2 class="text-2xl font-bold mb-4">Chapter 1: The Beginning</h2>
+                    <p class="mb-4">You wake up in a mysterious forest. The air is thick with magic, and you can hear strange sounds in the distance...</p>
+                    <p class="mb-4">What would you like to do?</p>
+                `;
+                
+                document.getElementById('gameControls').innerHTML = `
+                    <button onclick="makeChoice('explore')" class="w-full bg-blue-600 hover:bg-blue-700 p-3 rounded transition text-left">
+                        🔍 Explore the surroundings
+                    </button>
+                    <button onclick="makeChoice('listen')" class="w-full bg-green-600 hover:bg-green-700 p-3 rounded transition text-left">
+                        👂 Listen carefully to the sounds
+                    </button>
+                    <button onclick="makeChoice('shout')" class="w-full bg-red-600 hover:bg-red-700 p-3 rounded transition text-left">
+                        📢 Shout for help
+                    </button>
+                `;
+            }, 1500);
+        }
+
+        function continueGame() {
+            alert('No saved games found. Start a new adventure!');
+        }
+
+        function showWorlds() {
+            showLoading();
+            document.getElementById('gameArea').classList.remove('hidden');
+            
+            setTimeout(() => {
+                hideLoading();
+                document.getElementById('gameContent').innerHTML = `
+                    <h2 class="text-2xl font-bold mb-4">Available Worlds</h2>
+                    <div class="grid gap-4">
+                        <div class="border border-gray-700 rounded p-4 hover:border-indigo-600 transition cursor-pointer">
+                            <h3 class="font-bold">The Enchanted Forest</h3>
+                            <p class="text-sm text-gray-400">A magical realm full of mystery and wonder</p>
+                        </div>
+                        <div class="border border-gray-700 rounded p-4 hover:border-indigo-600 transition cursor-pointer">
+                            <h3 class="font-bold">Cyberpunk 2185</h3>
+                            <p class="text-sm text-gray-400">A futuristic dystopia where technology rules</p>
+                        </div>
+                        <div class="border border-gray-700 rounded p-4 hover:border-indigo-600 transition cursor-pointer">
+                            <h3 class="font-bold">Pirates of the Seven Seas</h3>
+                            <p class="text-sm text-gray-400">Sail the high seas in search of treasure</p>
+                        </div>
+                    </div>
+                `;
+                document.getElementById('gameControls').innerHTML = '';
+            }, 1000);
+        }
+
+        function makeChoice(choice) {
+            showLoading();
+            
+            // Simulate AI response
+            setTimeout(() => {
+                hideLoading();
+                let response = '';
+                
+                switch(choice) {
+                    case 'explore':
+                        response = `<p class="mb-4">You carefully explore the area and discover an ancient stone tablet with mysterious runes. As you touch it, the runes begin to glow...</p>`;
+                        break;
+                    case 'listen':
+                        response = `<p class="mb-4">You focus on the sounds and realize they're voices - speaking in an unknown language. They seem to be getting closer...</p>`;
+                        break;
+                    case 'shout':
+                        response = `<p class="mb-4">Your shout echoes through the forest. Suddenly, a figure emerges from the shadows - a wise-looking elf with glowing eyes...</p>`;
+                        break;
+                }
+                
+                document.getElementById('gameContent').innerHTML += response;
+                document.getElementById('gameContent').scrollTop = document.getElementById('gameContent').scrollHeight;
+            }, 1000);
+        }
+
+        function showLoading() {
+            document.getElementById('loadingState').classList.remove('hidden');
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingState').classList.add('hidden');
+        }
+
+        // Initialize
+        checkAuth();
+    </script>
+</body>
+</html>

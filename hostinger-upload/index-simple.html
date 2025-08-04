@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Adventure Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <!-- Video Background -->
+    <div class="fixed inset-0 w-full h-full overflow-hidden">
+        <video autoplay muted loop playsinline class="absolute min-w-full min-h-full object-cover">
+            <source src="videos/1.mp4" type="video/mp4">
+            <source src="videos/2.mp4" type="video/mp4">
+            <source src="videos/3.mp4" type="video/mp4">
+        </video>
+        <!-- Purple gradient fallback -->
+        <div class="absolute inset-0 bg-gradient-to-br from-purple-900 to-indigo-900"></div>
+        <!-- Dark overlay -->
+        <div class="absolute inset-0 bg-black bg-opacity-50"></div>
+    </div>
+
+    <!-- Content -->
+    <div class="relative z-10 min-h-screen flex flex-col items-center justify-center px-4">
+        <!-- Title -->
+        <h1 class="text-5xl md:text-7xl font-bold text-white mb-12 text-center">
+            AI Adventure Platform
+        </h1>
+
+        <!-- Login Form -->
+        <div class="w-full max-w-md">
+            <form class="bg-white bg-opacity-10 backdrop-blur-md shadow-2xl rounded-lg px-8 pt-6 pb-8 mb-4">
+                <div class="mb-6">
+                    <label class="block text-white text-sm font-bold mb-2" for="email">
+                        Email
+                    </label>
+                    <input class="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" 
+                           id="email" 
+                           type="email" 
+                           placeholder="Enter your email"
+                           value="demo@immersive-rpg.com">
+                </div>
+                <div class="mb-6">
+                    <label class="block text-white text-sm font-bold mb-2" for="password">
+                        Password
+                    </label>
+                    <input class="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline" 
+                           id="password" 
+                           type="password" 
+                           placeholder="Enter your password"
+                           value="DemoAccount123!">
+                </div>
+                <div class="flex items-center justify-between">
+                    <button class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded focus:outline-none focus:shadow-outline transition duration-300" 
+                            type="submit"
+                            onclick="event.preventDefault(); window.location.href='game.html';">
+                        Sign In
+                    </button>
+                </div>
+                <div class="text-center mt-4">
+                    <p class="text-sm text-gray-300">Demo credentials pre-filled</p>
+                </div>
+            </form>
+            <p class="text-center text-gray-400 text-xs">
+                &copy;2025 AI Adventure Platform. All rights reserved.
+            </p>
+        </div>
+    </div>
+</body>
+</html>
